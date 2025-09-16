@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QScrollArea
 )
 from PySide6.QtCore import Qt
-from image_canvas_v004 import ImageCanvas
+from image_canvas import ImageCanvas
 from image_folder import ImageFolder
 import os
 import sys
@@ -72,6 +72,8 @@ class MetaViewApp(QMainWindow):
         self.thumb_container = QWidget()
         self.thumb_layout = QHBoxLayout(self.thumb_container)
         self.thumb_scroll_area.setWidget(self.thumb_container)
+        self.thumb_scroll_area.setMinimumHeight(150)  # experiment with value
+
 
         filmstrip_layout.addWidget(self.thumb_scroll_area)
         center_layout.addWidget(self.filmstrip_frame, 1, 0)
@@ -90,7 +92,6 @@ class MetaViewApp(QMainWindow):
 
         center_layout.addWidget(self.button_frame, 2, 0)
 
-        # Example: wire one button to helper function
         open_btn.clicked.connect(self.open_test_image)
         next_btn.clicked.connect(self.show_next_image)
         prev_btn.clicked.connect(self.show_prev_image)
@@ -131,6 +132,18 @@ class MetaViewApp(QMainWindow):
             current = self.folder_model.prev()
             if current:
                 self.image_view.load_image(current["path"])
+
+    # Mouse wheel handler
+    def wheelEvent(self, event):
+        if event.angleDelta().y() > 0:
+            # wheel scrolled up
+            self.show_prev_image()
+        else:
+            # wheel scrolled down
+            self.show_next_image()
+
+        event.accept()
+
 
 
 
