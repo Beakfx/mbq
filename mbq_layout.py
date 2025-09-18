@@ -19,7 +19,7 @@ class MetaViewApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Image Viewer Layout")
-        self.resize(1150, 980)
+        self.resize(1400, 900)
         self.folder_model = None
         
         # Image cache
@@ -120,6 +120,7 @@ class MetaViewApp(QMainWindow):
         if self.folder_model:
             self.populate_filmstrip()
 
+
     def update_scale_factor(self):
         """Calculate scale factor based on current sizes"""
         if not hasattr(self, "image_view") or not hasattr(self, "filmstrip_frame"):
@@ -127,13 +128,16 @@ class MetaViewApp(QMainWindow):
             
         # Current available width and height
         avail_w = self.image_view.width()
-        avail_h = self.image_view.height() + self.filmstrip_frame.height()
+        avail_h = self.image_view.height()
+
+        print(f"Available space for image: {avail_w}x{avail_h}")
 
         # Compute scale factors relative to design sizes
         scale_w = avail_w / self.design_canvas_w
         scale_h = avail_h / self.design_total_h
         self.scale_factor = min(scale_w, scale_h)
         print(f"Scale factor updated: {self.scale_factor}")
+
 
     # --- Example method using helpers ---
     def open_test_image(self):

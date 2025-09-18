@@ -71,67 +71,47 @@ class ImageCanvas(QGraphicsView):
             print(f"Failed to load image: {path}")
             return
 
-        print(f"Loaded pixmap: {pixmap.width()}x{pixmap.height()}  path={path}")
+        print(f"Original: {pixmap.width()}x{pixmap.height()}")
+        print(f"Viewport: {self.viewport().width()}x{self.viewport().height()}")
 
         self.scene.clear()
 
-        # Compute target size = size of the viewport
-        target_size = self.viewport().size()
-        if not target_size.isValid():
-            target_size = pixmap.size()  # fallback
-
-        # Resample pixmap to fit viewport, with smooth filter
-        scaled = pixmap.scaled(
-            target_size,
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation
-        )
-
-        # Add new pixmap item
-        self.image_item = QGraphicsPixmapItem(scaled)
-        self.image_item.setPos(0, 0)
+        # Add the original pixmap without pre-scaling
+        self.image_item = QGraphicsPixmapItem(pixmap)
+        self.image_item.setTransformationMode(Qt.SmoothTransformation)
         self.scene.addItem(self.image_item)
 
-        # Update scene rect to fit the scaled pixmap
+        # Set scene rect to exact image size
         rect = self.image_item.boundingRect()
         self.scene.setSceneRect(rect)
-
-        # Center the image
+        
+        # Let fitInView handle all scaling consistently
         self.fitInView(rect, Qt.KeepAspectRatio)
+        
+        # Force update to ensure smooth rendering
         self.viewport().update()
 
-        print("image displayed")
-    
+        print(f"Displayed scene rect: {rect.width()}x{rect.height()}")
+
     # ← ADD THIS NEW METHOD FOR CACHING
     def load_image_from_pixmap(self, pixmap):
-        """Load already-loaded pixmap (for cache)"""
+        """Load already-loaded pixmap (for cache) - FIXED VERSION"""
         self.scene.clear()
 
-        # Compute target size = size of the viewport
-        target_size = self.viewport().size()
-        if not target_size.isValid():
-            target_size = pixmap.size()  # fallback
-
-        # Resample pixmap to fit viewport, with smooth filter
-        scaled = pixmap.scaled(
-            target_size,
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation
-        )
-
-        # Add new pixmap item
-        self.image_item = QGraphicsPixmapItem(scaled)
-        self.image_item.setPos(0, 0)
+        # Add the original pixmap without pre-scaling
+        self.image_item = QGraphicsPixmapItem(pixmap)
+        self.image_item.setTransformationMode(Qt.SmoothTransformation)
         self.scene.addItem(self.image_item)
 
-        # Update scene rect to fit the scaled pixmap
-        rect = self.image_item.boundingRect()
-        self.scene.setSceneRect(rect)
-
-        # Center the image
-        self.fitInView(rect, Qt.KeepAspectRatio)
+        # Set scene rect to exact image size
+        self.scene.setSceneRect(self.image_item.boundingRect())
+        
+        # Let fitInView handle the scaling (consistent with load_image)
+        self.fitInView(self.image_item, Qt.KeepAspectRatio)
+        
+        # Force update
         self.viewport().update()
-
-        print("image displayed from cache")
+        
+        print(f"Cached image displayed at: {self.image_item.boundingRect().width()}x{self.image_item.boundingRect().height()}")
 
     
