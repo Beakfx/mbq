@@ -8,7 +8,7 @@ from image_canvas import ImageCanvas
 from image_folder import ImageFolder
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QPixmap
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, QSize
 import os
 import sys
 
@@ -19,21 +19,15 @@ class MetaViewApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Image Viewer Layout")
-        self.resize(1150, 980)
+        self.resize(800, 550)
         self.folder_model = None
-        
-        # Image cache
-        self.image_cache = {}  # Dictionary to cache loaded images
-        self.cache_size = 5    # Number of images to keep cached
 
-        # --- Design reference sizes (for proportional scaling) ---
+        # --- Design reference sizes ---
         self.design_canvas_w = 672
-        self.design_canvas_h = 504
-        self.design_thumb_w = self.design_canvas_w // 5   # 134
-        self.design_thumb_h = self.design_thumb_w * 3 // 4  # 100
-        self.design_total_h = (
-            self.design_canvas_h + self.design_thumb_h + 40 + 20 + 20
-        )
+        self.design_canvas_h = 504  # 4:3 aspect ratio
+        self.design_thumb_w = 100   # Fixed thumbnail width
+        self.design_thumb_h = 75    # 4:3 aspect ratio for thumbs
+        
         self.scale_factor = 1.0
 
         # ---- Central Widget ----
@@ -42,10 +36,10 @@ class MetaViewApp(QMainWindow):
 
         # ---- Master Grid Layout ----
         self.main_layout = QGridLayout(central)
-        self.main_layout.setContentsMargins(10, 20, 30, 20)
+        self.main_layout.setContentsMargins(10, 20, 30, 40)
         self.main_layout.setSpacing(10)
 
-        # Column weights like Tkinter's columnconfigure
+        # Column weights
         self.main_layout.setColumnStretch(0, 0)   # left sidebar
         self.main_layout.setColumnStretch(1, 5)   # center area
         self.main_layout.setColumnStretch(2, 3)   # right panel future
@@ -61,47 +55,62 @@ class MetaViewApp(QMainWindow):
         self.center_group = QGroupBox("Image View and Controls")
         self.main_layout.addWidget(self.center_group, 0, 1)
         center_layout = QGridLayout(self.center_group)
-        center_layout.setRowStretch(0, 5)  # image view
-        center_layout.setRowStretch(1, 1)  # filmstrip
-        center_layout.setRowStretch(2, 0)  # buttons
-        center_layout.setRowStretch(3, 0)  # path display later
+        center_layout.setSpacing(0)  # ← ZERO spacing between rows
+
+        # Set row stretch factors - this is key for proper scaling
+        center_layout.setRowStretch(0, 5)  # image view (most space)
+        center_layout.setRowStretch(1, 1)  # filmstrip (less space)
+        center_layout.setRowStretch(2, 0)  # buttons (fixed height)
         center_layout.setColumnStretch(0, 1)
 
-        # ---- Image Canvas Equivalent ----
+        # ---- Image Canvas ----
         self.image_view = ImageCanvas()
         self.image_view.fileDropped.connect(self.load_image_from_path)
+        self.image_view.setMinimumSize(400, 300)  # Minimum 4:3 size
         center_layout.addWidget(self.image_view, 0, 0)
 
         # ---- Filmstrip Frame ----
         self.filmstrip_frame = QFrame()
         filmstrip_layout = QVBoxLayout(self.filmstrip_frame)
 
-        # Top separator
+        # REMOVE ALL SPACING AND MARGINS:
+        filmstrip_layout.setSpacing(0)
+        filmstrip_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Ultra-thin separator (or remove completely)
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
-        sep.setStyleSheet("color: #252222;")
+        sep.setStyleSheet("color: #252222; border: none;")  # ← Optional: make border invisible
+        sep.setFixedHeight(1)  # ← Only 1 pixel tall
         filmstrip_layout.addWidget(sep)
 
-        # Thumbnail scroller
+        # Thumbnail scroller - also remove any internal margins
         self.thumb_scroll_area = QScrollArea()
         self.thumb_scroll_area.setWidgetResizable(True)
+        self.thumb_scroll_area.setMinimumHeight(80)  # ← Reduce minimum height
+        self.thumb_scroll_area.setFrameShape(QFrame.NoFrame)  # ← Remove border if any
+
         self.thumb_container = QWidget()
         self.thumb_layout = QHBoxLayout(self.thumb_container)
-        self.thumb_scroll_area.setWidget(self.thumb_container)
+        self.thumb_layout.setSpacing(0)  # ← No spacing between thumbnails
+        self.thumb_layout.setContentsMargins(0, 0, 0, 0)  # ← No margins
 
+        self.thumb_scroll_area.setWidget(self.thumb_container)
         filmstrip_layout.addWidget(self.thumb_scroll_area)
+
         center_layout.addWidget(self.filmstrip_frame, 1, 0)
 
         # ---- Button Frame ----
         self.button_frame = QFrame()
         btn_layout = QHBoxLayout(self.button_frame)
+        btn_layout.setSpacing(10)
 
         next_btn = QPushButton("Next Image")
         prev_btn = QPushButton("Previous Image")
         open_btn = QPushButton("Open Image")
 
-        btn_layout.addWidget(next_btn)
         btn_layout.addWidget(prev_btn)
+        btn_layout.addWidget(next_btn)
         btn_layout.addWidget(open_btn)
 
         center_layout.addWidget(self.button_frame, 2, 0)
@@ -110,37 +119,31 @@ class MetaViewApp(QMainWindow):
         next_btn.clicked.connect(self.show_next_image)
         prev_btn.clicked.connect(self.show_prev_image)
 
-        # REMOVED THE PROBLEMATIC LINE: self.resizeEvent(None)
-        # Instead, use a timer to initialize after UI is fully built
-        QTimer.singleShot(100, self.initialize_scale)
+        # Set initial scale factor after UI is rendered
+        QTimer.singleShot(100, self.update_scale_factor)
 
-    def initialize_scale(self):
-        """Initialize scale factor after UI is fully built"""
-        self.update_scale_factor()
+    def update_scale_factor(self):
+        """Calculate scale factor based on current image view size"""
+        if not hasattr(self, "image_view") or not self.image_view.width():
+            return
+            
+        # Scale based on available width to maintain 4:3 aspect ratio
+        available_width = self.image_view.width()
+        self.scale_factor = available_width / self.design_canvas_w
+        
+        print(f"Scale factor updated: {self.scale_factor}")
+        
+        # Rebuild thumbs if folder is loaded
         if self.folder_model:
             self.populate_filmstrip()
 
-    def update_scale_factor(self):
-        """Calculate scale factor based on current sizes"""
-        if not hasattr(self, "image_view") or not hasattr(self, "filmstrip_frame"):
-            return
-            
-        # Current available width and height
-        avail_w = self.image_view.width()
-        avail_h = self.image_view.height() + self.filmstrip_frame.height()
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_scale_factor()
 
-        # Compute scale factors relative to design sizes
-        scale_w = avail_w / self.design_canvas_w
-        scale_h = avail_h / self.design_total_h
-        self.scale_factor = min(scale_w, scale_h)
-        print(f"Scale factor updated: {self.scale_factor}")
-
-    # --- Example method using helpers ---
+    # --- Rest of your methods remain the same ---
     def open_test_image(self):
-        """
-        Demo function: load a test image and print metadata.
-        """
-        path = "test.png"  # placeholder
+        path = "test.png"
         try:
             pixmap = helpers.load_image(path)
             meta = helpers.get_fake_metadata(path)
@@ -148,92 +151,36 @@ class MetaViewApp(QMainWindow):
         except FileNotFoundError as e:
             print(e)
 
-    #load image with path        
     def load_image_from_path(self, file_path):
         folder = os.path.dirname(file_path)
         self.folder_model = ImageFolder(folder, start_file=file_path)
-        
-        # Clear cache when folder changes
-        self.image_cache.clear()
 
         current = self.folder_model.current()
         if current:
             print("Displaying:", current["name"])
-            self.display_image(current["path"])
+            self.image_view.load_image(current["path"])
         self.populate_filmstrip()
-        self.preload_adjacent_images()
-
-    # New method for displaying images
-    def display_image(self, path):
-        """Display image from cache or load it"""
-        if path in self.image_cache:
-            # Use cached pixmap
-            print(f"Using cached image: {os.path.basename(path)}")
-            self.image_view.load_image_from_pixmap(self.image_cache[path])
-        else:
-            # Load and cache
-            pixmap = QPixmap(path)
-            if not pixmap.isNull():
-                self.image_cache[path] = pixmap
-                self.image_view.load_image(path)
-
-    # New method for preloading
-    def preload_adjacent_images(self):
-        """Pre-load images around current index"""
-        if not self.folder_model or not self.folder_model.files:
-            return
-            
-        files = self.folder_model.files
-        current_idx = self.folder_model.index
-        
-        # Pre-load 2 images on each side
-        for offset in range(-2, 3):
-            if offset == 0:
-                continue  # Skip current (already loaded)
-                
-            idx = (current_idx + offset) % len(files)
-            path = files[idx]["path"]
-            
-            if path not in self.image_cache:
-                # Load into cache but don't display
-                print(f"Pre-loading: {os.path.basename(path)}")
-                pixmap = QPixmap(path)
-                if not pixmap.isNull():
-                    self.image_cache[path] = pixmap
 
     def show_next_image(self):
         if self.folder_model:
             current = self.folder_model.next()
             if current:
-                self.display_image(current["path"])
+                self.image_view.load_image(current["path"])
                 self.populate_filmstrip()
-                self.preload_adjacent_images()
 
     def show_prev_image(self):
         if self.folder_model:
             current = self.folder_model.prev()
             if current:
-                self.display_image(current["path"])
+                self.image_view.load_image(current["path"])
                 self.populate_filmstrip()
-                self.preload_adjacent_images()
 
-    # Mouse wheel handler
     def wheelEvent(self, event):
         if event.angleDelta().y() > 0:
-            # wheel scrolled up
             self.show_prev_image()
         else:
-            # wheel scrolled down
             self.show_next_image()
-
         event.accept()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.update_scale_factor()
-        # Rebuild thumbs at new scale
-        if self.folder_model:
-            self.populate_filmstrip()
 
     def populate_filmstrip(self):
         # Clear old thumbnails
@@ -245,33 +192,47 @@ class MetaViewApp(QMainWindow):
         if not self.folder_model:
             return
 
-        # Scale design size by current factor
+        # Calculate thumbnail size based on scale factor
         thumb_w = max(64, int(self.design_thumb_w * self.scale_factor))
         thumb_h = max(48, int(self.design_thumb_h * self.scale_factor))
+        
+        print(f"Thumbnail size: {thumb_w}x{thumb_h}")
 
-        # Show 5 thumbnails centered on current index
+        # Show thumbnails centered on current index
         center_index = self.folder_model.index
         files = self.folder_model.files
         if not files:
             return
 
-        for offset in range(-2, 3):
+        for offset in range(-3, 4):
             idx = (center_index + offset) % len(files)
             file_path = files[idx]["path"]
 
-            pix = QPixmap(file_path).scaled(
-                thumb_w, thumb_h,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-            lbl = QLabel()
-            lbl.setPixmap(pix)
-            lbl.setAlignment(Qt.AlignCenter)
+            try:
+                pix = QPixmap(file_path).scaled(
+                    thumb_w, thumb_h,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                )
+                lbl = QLabel()
+                lbl.setPixmap(pix)
+                lbl.setAlignment(Qt.AlignCenter)
+                lbl.setFixedSize(thumb_w, thumb_h)
+                
+                # Highlight current image
+                if idx == center_index:
+                    lbl.setStyleSheet("border: 2px solid #339933;")
+                else:
+                    lbl.setStyleSheet("border: 1px solid gray;")
+                
+                self.thumb_layout.addWidget(lbl)
+            except Exception as e:
+                print(f"Error loading thumbnail {file_path}: {e}")
 
-            self.thumb_layout.addWidget(lbl)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MetaViewApp()
     window.show()
     sys.exit(app.exec())
+

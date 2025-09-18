@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
-from PySide6.QtGui import QPixmap, QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QPainter
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPainter
+from PySide6.QtOpenGLWidgets import QOpenGLWidget  # ← ADD THIS IMPORT
 import os
 
 
@@ -29,9 +29,12 @@ class ImageCanvas(QGraphicsView):
         # Keep track of current image
         self.image_item: QGraphicsPixmapItem | None = None
 
-        #Make them nice to look at
+        # Make them nice to look at
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        
+        # ← ADD OPENGL ACCELERATION HERE
+        self.setViewport(QOpenGLWidget())  # Hardware-accelerated rendering
 
     # --- Drag & Drop Events ---
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -98,3 +101,37 @@ class ImageCanvas(QGraphicsView):
         self.viewport().update()
 
         print("image displayed")
+    
+    # ← ADD THIS NEW METHOD FOR CACHING
+    def load_image_from_pixmap(self, pixmap):
+        """Load already-loaded pixmap (for cache)"""
+        self.scene.clear()
+
+        # Compute target size = size of the viewport
+        target_size = self.viewport().size()
+        if not target_size.isValid():
+            target_size = pixmap.size()  # fallback
+
+        # Resample pixmap to fit viewport, with smooth filter
+        scaled = pixmap.scaled(
+            target_size,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+
+        # Add new pixmap item
+        self.image_item = QGraphicsPixmapItem(scaled)
+        self.image_item.setPos(0, 0)
+        self.scene.addItem(self.image_item)
+
+        # Update scene rect to fit the scaled pixmap
+        rect = self.image_item.boundingRect()
+        self.scene.setSceneRect(rect)
+
+        # Center the image
+        self.fitInView(rect, Qt.KeepAspectRatio)
+        self.viewport().update()
+
+        print("image displayed from cache")
+
+    
