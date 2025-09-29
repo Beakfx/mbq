@@ -1,9 +1,10 @@
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
 from PySide6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QPainter
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtOpenGLWidgets import QOpenGLWidget  # ← ADD THIS IMPORT
+from PySide6.QtOpenGLWidgets import QOpenGLWidget
 import os
 
+"""this defines the 'canvas' class, meaning the area where images are dropped and displayed"""
 
 class ImageCanvas(QGraphicsView):
     # Signal emitted when a valid file is dropped
@@ -33,8 +34,20 @@ class ImageCanvas(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setRenderHint(QPainter.SmoothPixmapTransform, True)
         
-        # ← ADD OPENGL ACCELERATION HERE
         self.setViewport(QOpenGLWidget())  # Hardware-accelerated rendering
+
+     # Enable keyboard focus for the canvas
+        self.setFocusPolicy(Qt.StrongFocus)
+
+    def keyPressEvent(self, event):
+        """Forward arrow keys to main window for navigation"""
+        if event.key() in (Qt.Key_Right, Qt.Key_Left):
+            main_window = self.window()  # Get the actual main window, not just the immediate parent
+            if main_window:
+                main_window.keyPressEvent(event)
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
     # --- Drag & Drop Events ---
     def dragEnterEvent(self, event: QDragEnterEvent):
