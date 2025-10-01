@@ -3,11 +3,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QScrollArea
 )
-from PySide6.QtCore import Qt
 from image_canvas import ImageCanvas
-from PySide6.QtWidgets import QLabel
-from PySide6.QtCore import QTimer
 from PySide6.QtCore import Qt, QTimer, QEvent
+from png_parser import parse_png_workflow
+from workflow_cache import WorkflowCache
+
 
 import sys
 
@@ -20,7 +20,8 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Image Viewer GL Layout")
-        
+        self.workflow_cache = WorkflowCache(max_size=50)
+
         # --- 4:3 Optimized Window Size ---
         # Calculate for 1024x768 image + UI elements
         self.resize(1400, 900)  # Wider window to accommodate right sidebar
@@ -155,20 +156,18 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
             
     def eventFilter(self, obj, event):
         if event.type() == QEvent.KeyPress:
-            print(f"🎹 EVENT FILTER: Key {event.key()} in {type(obj).__name__}")
             if event.key() in (Qt.Key_Right, Qt.Key_Left):
-                print("🎹 EVENT FILTER: Calling keyPressEvent directly")
                 result = self.keyPressEvent(event)
-                print(f"🎹 EVENT FILTER: keyPressEvent returned {result}")
                 return True  # Event handled, stop propagation
         return super().eventFilter(obj, event)
 
-
-    def check_focus(self):
-        """Check what has focus"""
-        print(f"🎯 Current focus widget: {self.focusWidget()}")
-        print(f"🎯 Main window has focus: {self.hasFocus()}")
-        print(f"🎯 Image view has focus: {self.image_view.hasFocus()}")
+    def get_workflow_data(self, file_path):
+        """Get workflow data using cache"""
+        return self.workflow_cache.get(file_path, parse_png_workflow)
+    
+    def preload_workflows(self, file_paths):
+        """Preload workflows for nearby images"""
+        self.workflow_cache.preload_batch(file_paths, parse_png_workflow)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -7,7 +7,8 @@ from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QPixmap
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QFileDialog
-from pathlib import Path
+from workflow_cache import WorkflowCache
+from png_parser import parse_png_workflow, extract_prompt_info
 
 import struct
 import zlib
@@ -15,6 +16,7 @@ import os
 
 class MetaViewLogicMixin:
     """All the behavior logic goes here - no UI creation"""
+    
 
         # Mouse wheel handler
     def wheelEvent(self, event):
@@ -58,30 +60,77 @@ class MetaViewLogicMixin:
         scale_h = avail_h / self.design_canvas_h
         self.scale_factor = min(scale_w, scale_h)
 
-    
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.update_scale_factor()
-        if self.folder_model:
-            self.populate_filmstrip()
-
-    
-    #kind of a placeholder here for png chunks later
     def update_metadata(self, file_info):
-        """Update the right metadata panel with file information"""
+        """Update metadata panel with both file info and AI parameters."""
+        # --- File info (always available) ---
+        self.file_info_label.setText(
+            f"Name: {file_info['name']}\n"
+            f"Size: {file_info['size']:,} bytes\n"
+            f"Modified: {file_info['modified'].strftime('%Y-%m-%d %H:%M')}"
+        )
+
+        print(f"🔄 update_metadata called for: {file_info['name']}")
+
+        # --- Workflow / AI parameters ---
+        workflow_data = self.get_workflow_data(file_info['path'])
+        if workflow_data and "prompt_json" in workflow_data:
+            prompt_info = extract_prompt_info(workflow_data["prompt_json"])
+            
+            # Build a readable string dynamically
+            display_lines = []
+            if prompt_info.get("model"):
+                display_lines.append(f"Model: {prompt_info['model']}")
+            if prompt_info.get("steps"):
+                display_lines.append(f"Steps: {prompt_info['steps']}")
+            if prompt_info.get("sampler"):
+                display_lines.append(f"Sampler: {prompt_info['sampler']}")
+            if prompt_info.get("cfg_scale"):
+                display_lines.append(f"CFG/Guidance: {prompt_info['cfg_scale']}")
+            if prompt_info.get("seed"):
+                display_lines.append(f"Seed: {prompt_info['seed']}")
+            if prompt_info.get("positive_prompt"):
+                display_lines.append(f"Prompt: {prompt_info['positive_prompt'][:120]}...")
+
+            # Show it in the metadata panel
+            self.ai_params_label.setText("\n".join(display_lines))
+
+            # Debug printout in console
+            print("✅ Metadata extracted:")
+            for line in display_lines:
+                print("   " + line)
+
+        else:
+            print(f"❌ No workflow data for {file_info['name']}")
+            self.ai_params_label.setText("No workflow data found")
+
+
+        
+    """ this old version of update_MD might come in handy
+     def update_metadata(self, file_info):
+        Update metadata panel - this should trigger workflow parsing
+        # File info (always available)
         self.file_info_label.setText(
             f"Name: {file_info['name']}\n"
             f"Size: {file_info['size']:,} bytes\n"
             f"Modified: {file_info['modified'].strftime('%Y-%m-%d %H:%M')}"
         )
         
-        # Placeholder for AI metadata (you'll replace this with real data)
-        self.ai_params_label.setText(
-            "Model: Stable Diffusion\n"
-            "Size: 1024x768\n"
-            "Steps: 20\n"
-            "CFG: 7.5"
-        )
+        print(f"🔄 update_metadata called for: {file_info['name']}")
+
+        # AI parameters from workflow (this triggers parsing)
+        workflow_data = self.get_workflow_data(file_info['path'])
+        if workflow_data:
+            print(f"✅ Workflow data FOUND for {file_info['name']}:")
+            self.ai_params_label.setText(
+                f"Model: {workflow_data.get('model', 'Unknown')}\n"
+                f"Steps: {workflow_data.get('steps', '')}, Sampler: {workflow_data.get('sampler', '')}\n"
+                f"CFG: {workflow_data.get('cfg_scale', '')}, Seed: {workflow_data.get('seed', '')}\n"
+                f"Prompt: {workflow_data.get('positive_prompt', '')[:100]}..."
+            )
+        else:
+            print(f"❌ No workflow data for {file_info['name']}")
+            self.ai_params_label.setText("No workflow data found") """
+
 
     def load_image_from_path(self, file_path):
         folder = os.path.dirname(file_path)
@@ -92,6 +141,12 @@ class MetaViewLogicMixin:
         if current:
             print("Displaying:", current["name"])
             self.display_image(current["path"])
+
+
+            # TEST: Parse and display workflow data
+            self.test_workflow_parsing(current["path"])
+
+
             self.update_metadata(current)  # Update metadata panel
         self.populate_filmstrip()
         self.preload_adjacent_images()
@@ -112,7 +167,9 @@ class MetaViewLogicMixin:
             if path not in self.image_cache:
                 pixmap = QPixmap(path)
                 if not pixmap.isNull():
-                    self.image_cache[path] = pixmap
+                    self.image_cache[path] = pixmap 
+            ###self.get_workflow_data(path)
+
 
     def display_image(self, path):
         """Display image from cache or load it"""
@@ -122,7 +179,9 @@ class MetaViewLogicMixin:
             pixmap = QPixmap(path)
             if not pixmap.isNull():
                 self.image_cache[path] = pixmap
-                self.image_view.load_image(path)
+                self.image_view.load_image(path)    
+        self.get_workflow_data(path)
+
 
     def show_next_image(self):
         if self.folder_model:
@@ -206,8 +265,6 @@ class MetaViewLogicMixin:
             
             self.thumb_layout.addWidget(lbl)
 
-    from PySide6.QtWidgets import QFileDialog
-
     def open_image_file(self):
         """Open file dialog to select an image"""
         file_dialog = QFileDialog(self)
@@ -220,9 +277,38 @@ class MetaViewLogicMixin:
             if selected_files:
                 file_path = selected_files[0]
                 self.load_image_from_path(file_path)
+    
 
+    def test_workflow_parsing(self, file_path):
+        """Test function to parse and display workflow data"""
+        from png_parser import parse_png_workflow, extract_prompt_info
+        
+        print(f"\n🧪 TESTING WORKFLOW PARSING: {file_path}")
+        workflow_data = parse_png_workflow(file_path)
+        
+        if workflow_data:
+            print("✅ WORKFLOW DATA FOUND:")
+            print("=" * 50)
+            
+            if 'prompt_json' in workflow_data:
+                # Extract human-readable info
+                prompt_info = extract_prompt_info(workflow_data['prompt_json'])
+                print("\n🎨 EXTRACTED PROMPT INFO:")
+                for key, value in prompt_info.items():
+                    if value:  # Only show non-empty values
+                        print(f"   {key}: {value}")
+            
+            if 'workflow_json' in workflow_data:
+                print(f"\n📊 WORKFLOW JSON size: {len(str(workflow_data['workflow_json']))} chars")
+            
+            print("=" * 50)
+        else:
+            print("❌ No workflow data found")
+        
+        return workflow_data
 
-
+    
+    from png_parser import parse_png_workflow, extract_prompt_info
 
 
 

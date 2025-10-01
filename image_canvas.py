@@ -70,10 +70,8 @@ class ImageCanvas(QGraphicsView):
                 if os.path.isfile(file_path) and os.path.splitext(file_path)[1].lower() in (
                     ".png", ".jpg", ".jpeg", ".bmp", ".gif"
                 ):
-                    print("Dropped:", file_path)
                     self.fileDropped.emit(file_path)   # 👈 hand off to parent
                     event.acceptProposedAction()
-                    print("drop complete")
                     return
         event.ignore()
 
@@ -104,7 +102,7 @@ class ImageCanvas(QGraphicsView):
         # Force update to ensure smooth rendering
         self.viewport().update()
 
-        print(f"Displayed scene rect: {rect.width()}x{rect.height()}")
+#        print(f"Displayed scene rect: {rect.width()}x{rect.height()}")
 
     # ← ADD THIS NEW METHOD FOR CACHING
     def load_image_from_pixmap(self, pixmap):
@@ -125,6 +123,6 @@ class ImageCanvas(QGraphicsView):
         # Force update
         self.viewport().update()
         
-        print(f"Cached image displayed at: {self.image_item.boundingRect().width()}x{self.image_item.boundingRect().height()}")
+#        print(f"Cached image displayed at: {self.image_item.boundingRect().width()}x{self.image_item.boundingRect().height()}")
 
     
