@@ -1,13 +1,11 @@
 
-
 # metaview_logic.py
 from PySide6.QtCore import Qt
-from image_folder import ImageFolder
+from mbq_functions import ImageFolder
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QPixmap
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QFileDialog
-from workflow_cache import WorkflowCache
 from png_parser import parse_png_workflow, extract_prompt_info
 
 import struct
@@ -61,75 +59,53 @@ class MetaViewLogicMixin:
         self.scale_factor = min(scale_w, scale_h)
 
     def update_metadata(self, file_info):
-        """Update metadata panel with both file info and AI parameters."""
-        # --- File info (always available) ---
-        self.file_info_label.setText(
-            f"Name: {file_info['name']}\n"
-            f"Size: {file_info['size']:,} bytes\n"
-            f"Modified: {file_info['modified'].strftime('%Y-%m-%d %H:%M')}"
-        )
+        """Update metadata panel with file info and AI parameters"""
 
-        print(f"🔄 update_metadata called for: {file_info['name']}")
+        # --- File info section ---
+        self.file_name_value.setText(file_info['name'])
+        if 'width' in file_info and 'height' in file_info:
+            self.file_dim_value.setText(f"{file_info['width']} x {file_info['height']} px")
+        else:
+            self.file_dim_value.setText("—")
+        self.file_size_value.setText(f"{file_info['size']:,} bytes")
+        self.file_mod_value.setText(file_info['modified'].strftime('%Y-%m-%d %H:%M'))
 
-        # --- Workflow / AI parameters ---
+        print(f"🔄 update_metadata called with:",  file_info)
+
+        # --- AI parameters ---
         workflow_data = self.get_workflow_data(file_info['path'])
         if workflow_data and "prompt_json" in workflow_data:
             prompt_info = extract_prompt_info(workflow_data["prompt_json"])
-            
-            # Build a readable string dynamically
-            display_lines = []
-            if prompt_info.get("model"):
-                display_lines.append(f"Model: {prompt_info['model']}")
-            if prompt_info.get("steps"):
-                display_lines.append(f"Steps: {prompt_info['steps']}")
-            if prompt_info.get("sampler"):
-                display_lines.append(f"Sampler: {prompt_info['sampler']}")
-            if prompt_info.get("cfg_scale"):
-                display_lines.append(f"CFG/Guidance: {prompt_info['cfg_scale']}")
-            if prompt_info.get("seed"):
-                display_lines.append(f"Seed: {prompt_info['seed']}")
-            if prompt_info.get("positive_prompt"):
-                display_lines.append(f"Prompt: {prompt_info['positive_prompt'][:120]}...")
 
-            # Show it in the metadata panel
-            self.ai_params_label.setText("\n".join(display_lines))
+            self.model_value.setText(prompt_info.get("model", "—"))
+            self.steps_value.setText(str(prompt_info.get("steps", "—")))
+            self.sampler_value.setText(prompt_info.get("sampler", "—"))
+            self.cfg_value.setText(str(prompt_info.get("cfg_scale", "—")))
+            self.seed_value.setText(str(prompt_info.get("seed", "—")))
 
-            # Debug printout in console
-            print("✅ Metadata extracted:")
-            for line in display_lines:
-                print("   " + line)
+            # Limit prompt display length
+            prompt_text = prompt_info.get("positive_prompt", "")
+            if len(prompt_text) > 120:
+                prompt_text = prompt_text[:120] + "..."
+            self.prompt_value.setText(prompt_text)
+
+            print("✅ AI metadata populated")
 
         else:
-            print(f"❌ No workflow data for {file_info['name']}")
-            self.ai_params_label.setText("No workflow data found")
+            # Reset to blanks if nothing found
+            self.model_value.setText("—")
+            self.steps_value.setText("—")
+            self.sampler_value.setText("—")
+            self.cfg_value.setText("—")
+            self.seed_value.setText("—")
+            self.prompt_value.setText("No workflow data")
+
+            print("❌ No workflow data found")
 
 
-        
-    """ this old version of update_MD might come in handy
-     def update_metadata(self, file_info):
-        Update metadata panel - this should trigger workflow parsing
-        # File info (always available)
-        self.file_info_label.setText(
-            f"Name: {file_info['name']}\n"
-            f"Size: {file_info['size']:,} bytes\n"
-            f"Modified: {file_info['modified'].strftime('%Y-%m-%d %H:%M')}"
-        )
-        
-        print(f"🔄 update_metadata called for: {file_info['name']}")
 
-        # AI parameters from workflow (this triggers parsing)
-        workflow_data = self.get_workflow_data(file_info['path'])
-        if workflow_data:
-            print(f"✅ Workflow data FOUND for {file_info['name']}:")
-            self.ai_params_label.setText(
-                f"Model: {workflow_data.get('model', 'Unknown')}\n"
-                f"Steps: {workflow_data.get('steps', '')}, Sampler: {workflow_data.get('sampler', '')}\n"
-                f"CFG: {workflow_data.get('cfg_scale', '')}, Seed: {workflow_data.get('seed', '')}\n"
-                f"Prompt: {workflow_data.get('positive_prompt', '')[:100]}..."
-            )
-        else:
-            print(f"❌ No workflow data for {file_info['name']}")
-            self.ai_params_label.setText("No workflow data found") """
+
+   
 
 
     def load_image_from_path(self, file_path):

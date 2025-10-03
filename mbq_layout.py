@@ -1,16 +1,14 @@
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QScrollArea
+    QScrollArea, QTextEdit
 )
-from image_canvas import ImageCanvas
+from mbq_functions import ImageCanvas
 from PySide6.QtCore import Qt, QTimer, QEvent
 from png_parser import parse_png_workflow
-from workflow_cache import WorkflowCache
-
+from mbq_functions import WorkflowCache
 
 import sys
-
 
 
 from metaview_logic import MetaViewLogicMixin
@@ -124,23 +122,94 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
         center_layout.addWidget(self.button_frame, 2, 0)
 
+
+
+
+
         # --- Right Metadata Panel ---
         self.right_metadata = QGroupBox("Metadata")
         self.right_metadata.setMinimumWidth(300)  # ~1/4 of window width
-        metadata_layout = QVBoxLayout(self.right_metadata)
-        
-        # Placeholder metadata content
-        metadata_layout.addWidget(QLabel("File Information:"))
-        self.file_info_label = QLabel("No image loaded")
-        metadata_layout.addWidget(self.file_info_label)
-        
-        metadata_layout.addWidget(QLabel("AI Parameters:"))
-        self.ai_params_label = QLabel("Waiting for image...")
-        metadata_layout.addWidget(self.ai_params_label)
-        
-        metadata_layout.addStretch()  # Push content to top
-        
+
+        # Use a grid layout instead of VBox
+        metadata_layout = QGridLayout()
+        metadata_layout.setHorizontalSpacing(8)
+        metadata_layout.setVerticalSpacing(6)      # tighter rows
+        metadata_layout.setContentsMargins(8, 8, 8, 8)
+        self.right_metadata.setLayout(metadata_layout)
+
+        # Compact labels
+        label_style = "color: #888; font-size: 11px;"
+
+        def style_label(lbl):
+            lbl.setStyleSheet(label_style)
+            return lbl
+
+        # --- File Info ---
+        self.file_name_label = style_label(QLabel("File:"))
+        self.file_dim_label = style_label(QLabel("Dimensions:"))
+        self.file_size_label = style_label(QLabel("Size:"))
+        self.file_mod_label = style_label(QLabel("Modified:"))
+        self.model_label    = style_label(QLabel("Model:"))
+        self.steps_label    = style_label(QLabel("Steps:"))
+        self.sampler_label  = style_label(QLabel("Sampler:"))
+        self.cfg_label      = style_label(QLabel("CFG:"))
+        self.seed_label     = style_label(QLabel("Seed:"))
+        self.prompt_label   = style_label(QLabel("Prompt:"))
+
+
+        self.file_name_value = QLabel("—")
+        self.file_dim_value = QLabel("—")
+        self.file_size_value = QLabel("—")
+        self.file_mod_value = QLabel("—")
+
+        metadata_layout.addWidget(self.file_name_label, 0, 0)
+        metadata_layout.addWidget(self.file_name_value, 0, 1)
+        metadata_layout.addWidget(self.file_dim_label, 1, 0)
+        metadata_layout.addWidget(self.file_dim_value, 1, 1)
+        metadata_layout.addWidget(self.file_size_label, 2, 0)
+        metadata_layout.addWidget(self.file_size_value, 2, 1)
+        metadata_layout.addWidget(self.file_mod_label, 3, 0)
+        metadata_layout.addWidget(self.file_mod_value, 3, 1)
+
+        metadata_layout.setRowMinimumHeight(4, 12)  # 12px gap
+
+        self.model_value = QLabel("—")
+        self.steps_value = QLabel("—")
+        self.sampler_value = QLabel("—")
+        self.cfg_value = QLabel("—")
+        self.seed_value = QLabel("—")
+        #self.prompt_value = QLabel("—")
+        self.prompt_value = QTextEdit("—")
+        self.prompt_value.setReadOnly(True)
+        self.prompt_value.setFixedHeight(60)  # about 3 lines tall
+        self.prompt_value.setMaximumHeight(120)  # clamp max expansion
+        self.prompt_value.setLineWrapMode(QTextEdit.WidgetWidth)
+
+        row_offset = 5
+        metadata_layout.addWidget(self.model_label, row_offset + 0, 0)
+        metadata_layout.addWidget(self.model_value, row_offset + 0, 1)
+        metadata_layout.addWidget(self.steps_label, row_offset + 1, 0)
+        metadata_layout.addWidget(self.steps_value, row_offset + 1, 1)
+        metadata_layout.addWidget(self.sampler_label, row_offset + 2, 0)
+        metadata_layout.addWidget(self.sampler_value, row_offset + 2, 1)
+        metadata_layout.addWidget(self.cfg_label, row_offset + 3, 0)
+        metadata_layout.addWidget(self.cfg_value, row_offset + 3, 1)
+        metadata_layout.addWidget(self.seed_label, row_offset + 4, 0)
+        metadata_layout.addWidget(self.seed_value, row_offset + 4, 1)
+        #metadata_layout.addWidget(self.prompt_label, row_offset + 5, 0)
+        #metadata_layout.addWidget(self.prompt_value, row_offset + 5, 1)
+        metadata_layout.addWidget(self.prompt_label, row_offset + 5, 0, Qt.AlignTop)
+        metadata_layout.addWidget(self.prompt_value, row_offset + 5, 1)
+
+        # Add panel to main layout
         self.main_layout.addWidget(self.right_metadata, 0, 2)
+        # Keep content top-aligned
+        metadata_layout.setRowStretch(row_offset + 6, 1)
+
+
+     
+
+        
 
         # ---- Connect Signals ----
         open_btn.clicked.connect(self.open_image_file)

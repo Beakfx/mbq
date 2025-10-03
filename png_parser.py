@@ -72,8 +72,19 @@ def extract_prompt_info(prompt_json):
                 info['seed'] = inputs.get('seed', '')
                 info['sampler'] = inputs.get('sampler_name', '')
                 info['cfg_scale'] = inputs.get('cfg', '')
-        
+
+
+        # 🔑 Find model (Checkpoint or UNET/Flux)
+        for node_id, node_data in prompt_json.items():
+            ctype = node_data.get('class_type')
+            inputs = node_data.get('inputs', {})
+
+            if ctype in ('CheckpointLoaderSimple', 'CheckpointLoader'):
+                info['model'] = inputs.get('ckpt_name', '')
+            elif ctype == 'UNETLoader':  # Flux / SDXL style
+                info['model'] = inputs.get('unet_name', '')
         return info
+    
     except Exception as e:
         print(f"Error extracting prompt info: {e}")
         return {}
