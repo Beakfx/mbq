@@ -1,0 +1,358 @@
+
+============================================================
+📄 File: images\ControlNet_00010_upscale.png
+============================================================
+Workflow Type : Upscale
+Model         : 4x_NMKD-Siax_200k.pth
+Sampler       : euler
+Scheduler     : normal
+Steps         : 1
+CFG/Guidance  : 1.0
+Denoise       : 1.0
+Seed          : 285076160655419
+------------------------------------------------------------
+Detected Nodes (12):
+  • CLIPTextEncode
+  • CLIPTextEncodeFlux
+  • DualCLIPLoader
+  • Image Comparer (rgthree)
+  • ImageScale
+  • LoadImage
+  • PreviewImage
+  • SaveImage
+  • UNETLoader
+  • UltimateSDUpscale
+  • UpscaleModelLoader
+  • VAELoader
+
+
+============================================================
+📄 File: images\controlnet_i2i_tableLady_00004_.png
+============================================================
+Workflow Type : ControlNet
+Model         : None
+Sampler       : dpmpp_2m
+Scheduler     : sgm_uniform
+Steps         : 25
+CFG/Guidance  : 1.0
+Denoise       : 0.3600000000000001
+Seed          : 1072580640823242
+------------------------------------------------------------
+Detected Nodes (23):
+  • AIO_Preprocessor
+  • BasicGuider
+  • BasicScheduler
+  • CLIPTextEncode
+  • CLIPTextEncodeFlux
+  • ControlNetApplyAdvanced
+  • ControlNetLoader
+  • DualCLIPLoader
+  • EmptyLatentImage
+  • Image Comparer (rgthree)
+  • KSampler
+  • KSamplerSelect
+  • LoadImage
+  • PreviewImage
+  • RandomNoise
+  • SaveImage
+  • UNETLoader
+  • VAEDecode
+  • VAEEncode
+  • VAELoader
+
+
+============================================================
+📄 File: images\disc_fix_00006_.png
+============================================================
+Workflow Type : Inpaint
+Model         : None
+Sampler       : euler
+Scheduler     : beta
+Steps         : 30
+CFG/Guidance  : 25.0
+Denoise       : 1.0
+Seed          : 506728175275987
+------------------------------------------------------------
+Detected Nodes (16):
+  • CLIPTextEncode
+  • DifferentialDiffusion
+  • DualCLIPLoader
+  • FluxGuidance
+  • Image Comparer (rgthree)
+  • InpaintCrop
+  • InpaintModelConditioning
+  • InpaintStitch
+  • KSampler
+  • LoadImage
+  • SaveImage
+  • UNETLoader
+  • VAEDecode
+  • VAELoader
+
+
+============================================================
+📄 File: images\hand_rescue_00009_.png
+============================================================
+Workflow Type : Inpaint
+Model         : None
+Sampler       : dpmpp_2m
+Scheduler     : sgm_uniform
+Steps         : 30
+CFG/Guidance  : 30.0
+Denoise       : 1.0
+Seed          : 1029107972313463
+------------------------------------------------------------
+Detected Nodes (15):
+  • CLIPTextEncode
+  • DifferentialDiffusion
+  • DualCLIPLoader
+  • FluxGuidance
+  • Image Comparer (rgthree)
+  • InpaintCrop
+  • InpaintModelConditioning
+  • InpaintStitch
+  • KSampler
+  • LoadImage
+  • SaveImage
+  • UNETLoader
+  • VAEDecode
+  • VAELoader
+
+
+============================================================
+📄 File: images\inpaint_chain_fix_00001_.png
+============================================================
+Workflow Type : Inpaint
+Model         : None
+Sampler       : euler
+Scheduler     : beta
+Steps         : 36
+CFG/Guidance  : 28.400000000000002
+Denoise       : 1.0
+Seed          : 758515993136554
+------------------------------------------------------------
+Detected Nodes (16):
+  • CLIPTextEncode
+  • DifferentialDiffusion
+  • DualCLIPLoader
+  • FluxGuidance
+  • Image Comparer (rgthree)
+  • InpaintCrop
+  • InpaintModelConditioning
+  • InpaintStitch
+  • KSampler
+  • LoadImage
+  • SaveImage
+  • UNETLoader
+  • VAEDecode
+  • VAELoader
+
+
+============================================================
+📄 File: images\long_prompt.0001.png
+============================================================
+Workflow Type : Text-to-Image
+Model         : None
+Sampler       : euler
+Scheduler     : simple
+Steps         : 20
+CFG/Guidance  : None
+Denoise       : 1.0
+Seed          : 845373432002232
+------------------------------------------------------------
+Detected Nodes (12):
+  • BasicGuider
+  • BasicScheduler
+  • CLIPTextEncode
+  • DualCLIPLoader
+  • EmptyLatentImage
+  • KSamplerSelect
+  • RandomNoise
+  • SamplerCustomAdvanced
+  • SaveImage
+  • UNETLoader
+  • VAEDecode
+  • VAELoader
+
+
+============================================================
+📄 File: images\one.png
+============================================================
+❌ No prompt JSON found
+
+============================================================
+📄 File: images\outpaint_eg.png
+============================================================
+Workflow Type : Inpaint
+Model         : None
+Sampler       : euler
+Scheduler     : beta
+Steps         : 30
+CFG/Guidance  : 30.0
+Denoise       : 1.0
+Seed          : 586110863783182
+------------------------------------------------------------
+Detected Nodes (15):
+  • CLIPTextEncode
+  • DifferentialDiffusion
+  • DualCLIPLoader
+  • FluxGuidance
+  • InpaintCrop
+  • InpaintExtendOutpaint
+  • InpaintModelConditioning
+  • InpaintStitch
+  • KSampler
+  • LoadImage
+  • SaveImage
+  • UNETLoader
+  • VAEDecode
+  • VAELoader
+
+
+============================================================
+📄 File: images\red_head_3k_00002_.png
+============================================================
+Workflow Type : Upscale
+Model         : nmkdSiaxCX_200k.pth
+Sampler       : euler
+Scheduler     : beta
+Steps         : 20
+CFG/Guidance  : 0.0
+Denoise       : 0.16
+Seed          : 1061959295871139
+------------------------------------------------------------
+Detected Nodes (19):
+  • BasicScheduler
+  • CLIPTextEncode
+  • CheckpointLoaderSimple
+  • ConditioningCombine
+  • ConditioningSetTimestepRange
+  • ConditioningZeroOut
+  • DetailDaemonSamplerNode
+  • EmptySD3LatentImage
+  • Image Comparer (rgthree)
+  • ImageScale
+  • KSamplerSelect
+  • LoadImage
+  • ModelSamplingSD3
+  • SaveImage
+  • TripleCLIPLoader
+  • UltimateSDUpscaleCustomSample
+  • UpscaleModelLoader
+
+
+============================================================
+📄 File: images\redux_1_00002_.png
+============================================================
+Workflow Type : Text-to-Image
+Model         : flux1-redux-dev.safetensors
+Sampler       : euler
+Scheduler     : simple
+Steps         : 20
+CFG/Guidance  : 4.0
+Denoise       : 1.0
+Seed          : 162089893908859
+------------------------------------------------------------
+Detected Nodes (19):
+  • BasicGuider
+  • BasicScheduler
+  • CLIPTextEncode
+  • CLIPVisionEncode
+  • CLIPVisionLoader
+  • DualCLIPLoader
+  • EmptySD3LatentImage
+  • FluxGuidance
+  • KSamplerSelect
+  • LoadImage
+  • ModelSamplingFlux
+  • RandomNoise
+  • SamplerCustomAdvanced
+  • SaveImage
+  • StyleModelApply
+  • StyleModelLoader
+  • UNETLoader
+  • VAEDecode
+  • VAELoader
+
+
+============================================================
+📄 File: images\sd3.5_atm.0001.png
+============================================================
+Workflow Type : Text-to-Image
+Model         : sd3.5_large.safetensors
+Sampler       : dpmpp_2m
+Scheduler     : sgm_uniform
+Steps         : 40
+CFG/Guidance  : 4.5
+Denoise       : 1.0
+Seed          : 347071645806382
+------------------------------------------------------------
+Detected Nodes (14):
+  • CLIPTextEncode
+  • CheckpointLoaderSimple
+  • ConditioningCombine
+  • ConditioningSetTimestepRange
+  • ConditioningZeroOut
+  • EmptySD3LatentImage
+  • KSampler
+  • ModelSamplingSD3
+  • PreviewImage
+  • SaveImage
+  • TripleCLIPLoader
+  • VAEDecode
+
+
+============================================================
+📄 File: images\source_inpaint_00034_.png
+============================================================
+Workflow Type : Inpaint
+Model         : None
+Sampler       : euler
+Scheduler     : beta
+Steps         : 30
+CFG/Guidance  : 36.0
+Denoise       : 1.0
+Seed          : 447427629614705
+------------------------------------------------------------
+Detected Nodes (14):
+  • CLIPTextEncode
+  • DifferentialDiffusion
+  • DualCLIPLoader
+  • FluxGuidance
+  • InpaintCrop
+  • InpaintModelConditioning
+  • InpaintStitch
+  • KSampler
+  • LoadImage
+  • SaveImage
+  • UNETLoader
+  • VAEDecode
+  • VAELoader
+
+
+============================================================
+📄 File: images\straight_gen_notReading.png
+============================================================
+Workflow Type : Text-to-Image
+Model         : None
+Sampler       : dpmpp_2m
+Scheduler     : sgm_uniform
+Steps         : 23
+CFG/Guidance  : 5.0
+Denoise       : 1.0
+Seed          : 583741017171973
+------------------------------------------------------------
+Detected Nodes (12):
+  • BasicGuider
+  • BasicScheduler
+  • CLIPTextEncodeFlux
+  • DualCLIPLoader
+  • EmptyLatentImage
+  • KSamplerSelect
+  • RandomNoise
+  • SamplerCustomAdvanced
+  • SaveImage
+  • UNETLoader
+  • VAEDecode
+  • VAELoader
+
