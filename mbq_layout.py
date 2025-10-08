@@ -1,3 +1,4 @@
+
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
@@ -7,11 +8,13 @@ from mbq_functions import ImageCanvas
 from PySide6.QtCore import Qt, QTimer, QEvent
 from png_parser import parse_png_workflow
 from mbq_functions import WorkflowCache
+from metaview_logic import MetaViewLogicMixin
+
 
 import sys
 
 
-from metaview_logic import MetaViewLogicMixin
+
 
 class MetaViewApp(MetaViewLogicMixin, QMainWindow):
     # Now inherits from both QMainWindow and our logic mixin
