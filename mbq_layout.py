@@ -6,10 +6,10 @@ from PySide6.QtWidgets import (
 )
 from mbq_functions import ImageCanvas
 from PySide6.QtCore import Qt, QTimer, QEvent
-from png_parser import parse_png_workflow
 from mbq_functions import WorkflowCache
-from metaview_logic import MetaViewLogicMixin
-
+from mbq_logic import MetaViewLogicMixin
+from mbq_parser import parse_png_metadata, ImageMetadata
+from mbq_logic import get_image_metadata
 
 import sys
 
@@ -235,11 +235,39 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
     def get_workflow_data(self, file_path):
         """Get workflow data using cache"""
-        return self.workflow_cache.get(file_path, parse_png_workflow)
+        return self.workflow_cache.get(file_path, parse_png_metadata)
     
     def preload_workflows(self, file_paths):
         """Preload workflows for nearby images"""
-        self.workflow_cache.preload_batch(file_paths, parse_png_workflow)
+        self.workflow_cache.preload_batch(file_paths, parse_png_metadata)
+
+
+
+
+def update_metadata(self, file_info):
+    """
+    Update the right-side metadata panel.
+    """
+    print(f"🔍 Updating metadata for: {file_info['path']}")
+    md = get_image_metadata(file_info["path"])
+
+    # --- Basic file info ---
+    self.file_name_value.setText(file_info["name"])
+    self.file_dim_value.setText(f"{file_info.get('width', '—')}×{file_info.get('height', '—')}")
+    self.file_size_value.setText(f"{file_info['size'] / 1024:.1f} KB")
+    self.file_mod_value.setText(file_info["modified"].strftime("%Y-%m-%d %H:%M"))
+
+    # --- AI metadata ---
+    self.model_value.setText(md.model or "—")
+    self.steps_value.setText(str(md.steps or "—"))
+    self.sampler_value.setText(md.sampler or "—")
+    self.cfg_value.setText(str(md.cfg or "—"))
+    self.seed_value.setText(str(md.seed or "—"))
+    self.prompt_value.setPlainText(md.prompt or "")
+
+    # Optional extras for later tabs:
+    self.right_metadata.setToolTip(f"Workflow: {md.workflow_type}\nControlNets: {', '.join(md.controlnets)}")
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
