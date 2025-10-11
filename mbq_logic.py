@@ -70,36 +70,35 @@ class MetaViewLogicMixin:
         self.file_size_value.setText(f"{file_info['size']:,} bytes")
         self.file_mod_value.setText(file_info['modified'].strftime('%Y-%m-%d %H:%M'))
 
-        print(f"🔄 update_metadata called with:",  file_info)
+        print(f"🔄 update_metadata called for:",  file_info['name'] )
+
+
 
         # --- AI parameters ---
         workflow_data = self.get_workflow_data(file_info['path'])
-        if workflow_data and "prompt_json" in workflow_data:
-            prompt_info = extract_prompt_info(workflow_data["prompt_json"])
 
-            self.model_value.setText(prompt_info.get("model", "—"))
-            self.steps_value.setText(str(prompt_info.get("steps", "—")))
-            self.sampler_value.setText(prompt_info.get("sampler", "—"))
-            self.cfg_value.setText(str(prompt_info.get("cfg_scale", "—")))
-            self.seed_value.setText(str(prompt_info.get("seed", "—")))
+        if workflow_data:
+            md = workflow_data  # alias for clarity
 
-            # Limit prompt display length
-            prompt_text = prompt_info.get("positive_prompt", "")
-            if len(prompt_text) > 120:
-                prompt_text = prompt_text[:120] + "..."
-            self.prompt_value.setText(prompt_text)
+            self.model_value.setText(md.model or "—")
+            self.steps_value.setText(str(md.steps or "—"))
+            self.sampler_value.setText(md.sampler or "—")
+            self.cfg_value.setText(str(md.cfg or "—"))
+            self.seed_value.setText(str(md.seed or "—"))
+
+            # Clean up prompt for display
+            prompt_text = (md.prompt or "").strip()
+            self.prompt_value.setText(prompt_text or "(no prompt found)")
 
             print("✅ AI metadata populated")
 
         else:
-            # Reset to blanks if nothing found
             self.model_value.setText("—")
             self.steps_value.setText("—")
             self.sampler_value.setText("—")
             self.cfg_value.setText("—")
             self.seed_value.setText("—")
             self.prompt_value.setText("No workflow data")
-
             print("❌ No workflow data found")
 
 
@@ -117,15 +116,10 @@ class MetaViewLogicMixin:
         if current:
             print("Displaying:", current["name"])
             self.display_image(current["path"])
-
-
-            # TEST: Parse and display workflow data
-            self.test_workflow_parsing(current["path"])
-
-
             self.update_metadata(current)  # Update metadata panel
         self.populate_filmstrip()
         self.preload_adjacent_images()
+
 
     def preload_adjacent_images(self):
         """Pre-load images around current index"""
@@ -144,7 +138,6 @@ class MetaViewLogicMixin:
                 pixmap = QPixmap(path)
                 if not pixmap.isNull():
                     self.image_cache[path] = pixmap 
-            ###self.get_workflow_data(path)
 
 
     def display_image(self, path):

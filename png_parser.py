@@ -1,91 +1,52 @@
-# png_parser.py
-import struct
-import json
+import struct, json, zlib
+from pathlib import Path
 
-def parse_png_workflow(file_path):
-    """Parse PNG file and extract ComfyUI workflow data"""
+def pretty_print_png_json(file_path):
+    """Read PNG metadata chunks (prompt/workflow) and print pretty JSON."""
     try:
-        with open(file_path, 'rb') as f:
-            signature = f.read(8)
-            if signature != b'\x89PNG\r\n\x1a\n':
-                return None
-            
-            workflow_data = {}
-            
+        with open(file_path, "rb") as f:
+            if f.read(8) != b"\x89PNG\r\n\x1a\n":
+                print(f"[!] {file_path} is not a valid PNG")
+                return
+
             while True:
-                length_data = f.read(4)
-                if not length_data:
+                length_bytes = f.read(4)
+                if not length_bytes:
                     break
-                    
-                chunk_length = struct.unpack('>I', length_data)[0]
-                chunk_type = f.read(4).decode('ascii')
-                chunk_data = f.read(chunk_length)
-                f.read(4)  # Skip CRC
-                
-                if chunk_type == 'tEXt':
-                    parts = chunk_data.split(b'\x00', 1)
-                    if len(parts) == 2:
-                        keyword = parts[0].decode('latin-1')
-                        text = parts[1].decode('latin-1')
-                        
-                        if keyword == 'prompt':
-                            workflow_data['prompt_json'] = json.loads(text)
-                        elif keyword == 'workflow':
-                            workflow_data['workflow_json'] = json.loads(text)
-                
-                if chunk_type == 'IEND':
+
+                length = struct.unpack(">I", length_bytes)[0]
+                ctype = f.read(4).decode("ascii", errors="ignore")
+                data = f.read(length)
+                f.read(4)  # skip CRC
+
+                if ctype in ("tEXt", "iTXt", "zTXt"):
+                    keyword, _, raw_text = data.partition(b"\x00")
+                    keyword = keyword.decode("latin-1", errors="ignore")
+
+                    # decompress if zTXt
+                    if ctype == "zTXt":
+                        try:
+                            raw_text = zlib.decompress(raw_text[2:])  # skip compression flag + method
+                        except Exception:
+                            pass
+
+                    text = raw_text.replace(b"\x00", b"").decode("utf-8", errors="ignore")
+
+                    if keyword.lower() in ("prompt", "workflow"):
+                        print(f"\n--- {file_path.name} :: {keyword} ---")
+                        try:
+                            parsed = json.loads(text)
+                            print(json.dumps(parsed, indent=2, ensure_ascii=False))
+                        except json.JSONDecodeError:
+                            print(text)
+
+                if ctype == "IEND":
                     break
-            
-            return workflow_data if workflow_data else None
-                    
     except Exception as e:
-        print(f"Error parsing {file_path}: {e}")
-        return None
-
-def extract_prompt_info(prompt_json):
-    """Extract human-readable info from ComfyUI prompt JSON"""
-    try:
-        info = {
-            'positive_prompt': '',
-            'negative_prompt': '', 
-            'model': '',
-            'sampler': '',
-            'steps': '',
-            'seed': '',
-            'cfg_scale': ''
-        }
-        
-        # Find positive prompt (look for CLIPTextEncode nodes)
-        for node_id, node_data in prompt_json.items():
-            if node_data.get('class_type') == 'CLIPTextEncode':
-                text = node_data.get('inputs', {}).get('text', '')
-                if text and not info['positive_prompt']:  # First one is usually positive
-                    info['positive_prompt'] = text
-                elif text:  # Second one is usually negative
-                    info['negative_prompt'] = text
-        
-        # Find KSampler settings
-        for node_id, node_data in prompt_json.items():
-            if node_data.get('class_type') == 'KSampler':
-                inputs = node_data.get('inputs', {})
-                info['steps'] = inputs.get('steps', '')
-                info['seed'] = inputs.get('seed', '')
-                info['sampler'] = inputs.get('sampler_name', '')
-                info['cfg_scale'] = inputs.get('cfg', '')
+        print(f"[!] Error parsing {file_path}: {e}")
 
 
-        # 🔑 Find model (Checkpoint or UNET/Flux)
-        for node_id, node_data in prompt_json.items():
-            ctype = node_data.get('class_type')
-            inputs = node_data.get('inputs', {})
-
-            if ctype in ('CheckpointLoaderSimple', 'CheckpointLoader'):
-                info['model'] = inputs.get('ckpt_name', '')
-            elif ctype == 'UNETLoader':  # Flux / SDXL style
-                info['model'] = inputs.get('unet_name', '')
-        return info
-    
-    except Exception as e:
-        print(f"Error extracting prompt info: {e}")
-        return {}
-    
+if __name__ == "__main__":
+    folder = Path("images")
+    for png in folder.glob("*.png"):
+        pretty_print_png_json(png)

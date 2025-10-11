@@ -1,4 +1,7 @@
+
+
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Optional, Dict
 
 @dataclass
@@ -6,7 +9,7 @@ class ImageMetadata:
     """Unified structure for parsed genAI metadata (MB data)"""
 
     # Core identifiers
-    filename: str
+    file: Path
     workflow_type: Optional[str] = None
     model: Optional[str] = None
 
@@ -14,6 +17,7 @@ class ImageMetadata:
     sampler: Optional[str] = None
     scheduler: Optional[str] = None
     steps: Optional[int] = None
+    cfg: Optional[float] = None
     guidance: Optional[float] = None
     denoise: Optional[float] = None
     seed: Optional[int] = None

@@ -2,14 +2,14 @@
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QScrollArea, QTextEdit
+    QScrollArea, QTextEdit, QSizePolicy
 )
 from mbq_functions import ImageCanvas
 from PySide6.QtCore import Qt, QTimer, QEvent
+from mbq_parser import parse_png_metadata
 from mbq_functions import WorkflowCache
 from mbq_logic import MetaViewLogicMixin
-from mbq_parser import parse_png_metadata, ImageMetadata
-from mbq_logic import get_image_metadata
+
 
 import sys
 
@@ -182,11 +182,22 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.cfg_value = QLabel("—")
         self.seed_value = QLabel("—")
         #self.prompt_value = QLabel("—")
+
         self.prompt_value = QTextEdit("—")
         self.prompt_value.setReadOnly(True)
         self.prompt_value.setFixedHeight(60)  # about 3 lines tall
         self.prompt_value.setMaximumHeight(120)  # clamp max expansion
         self.prompt_value.setLineWrapMode(QTextEdit.WidgetWidth)
+
+        # --- Negative Prompt field ---
+        self.neg_prompt_label = style_label(QLabel("Neg. Prompt:"))
+        self.neg_prompt_value = QTextEdit("—")
+        self.neg_prompt_value.setReadOnly(True)
+        self.neg_prompt_value.setFixedHeight(60)          # about 3 lines tall
+        self.neg_prompt_value.setMaximumHeight(120)       # clamp max expansion
+        self.neg_prompt_value.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.neg_prompt_value.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
 
         row_offset = 5
         metadata_layout.addWidget(self.model_label, row_offset + 0, 0)
@@ -204,15 +215,24 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         metadata_layout.addWidget(self.prompt_label, row_offset + 5, 0, Qt.AlignTop)
         metadata_layout.addWidget(self.prompt_value, row_offset + 5, 1)
 
+        metadata_layout.addWidget(self.neg_prompt_label, row_offset + 6, 0, Qt.AlignTop)
+        metadata_layout.addWidget(self.neg_prompt_value, row_offset + 6, 1)
+
+
+            # --- Copy Metadata Button ---
+        copy_btn = QPushButton("Copy Metadata")
+        metadata_layout.setRowStretch(row_offset + 7, 1)  # spacer row
+        metadata_layout.addWidget(copy_btn, row_offset + 8, 0, 1, 2)
+        
+        
+        
         # Add panel to main layout
         self.main_layout.addWidget(self.right_metadata, 0, 2)
+
         # Keep content top-aligned
-        metadata_layout.setRowStretch(row_offset + 6, 1)
+        metadata_layout.setRowStretch(row_offset + 8, 1)
 
 
-     
-
-        
 
         # ---- Connect Signals ----
         open_btn.clicked.connect(self.open_image_file)
@@ -225,6 +245,30 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
         # Install event filter on THIS window only
         self.installEventFilter(self)
+
+        def copy_metadata_to_clipboard():
+            """Copy all current metadata text to clipboard."""
+            lines = [
+                f"File: {self.file_name_value.text()}",
+                f"Dimensions: {self.file_dim_value.text()}",
+                f"Size: {self.file_size_value.text()}",
+                f"Modified: {self.file_mod_value.text()}",
+                f"Model: {self.model_value.text()}",
+                f"Steps: {self.steps_value.text()}",
+                f"Sampler: {self.sampler_value.text()}",
+                f"CFG: {self.cfg_value.text()}",
+                f"Seed: {self.seed_value.text()}",
+                f"Prompt: {self.prompt_value.toPlainText()}",
+                f"Neg. Prompt: {self.neg_prompt_value.toPlainText()}",
+            ]
+            text = "\n".join(lines)
+            QApplication.clipboard().setText(text)
+            print("📋 Metadata copied to clipboard")
+
+
+        copy_btn.clicked.connect(copy_metadata_to_clipboard)
+
+
             
     def eventFilter(self, obj, event):
         if event.type() == QEvent.KeyPress:
@@ -240,33 +284,6 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
     def preload_workflows(self, file_paths):
         """Preload workflows for nearby images"""
         self.workflow_cache.preload_batch(file_paths, parse_png_metadata)
-
-
-
-
-def update_metadata(self, file_info):
-    """
-    Update the right-side metadata panel.
-    """
-    print(f"🔍 Updating metadata for: {file_info['path']}")
-    md = get_image_metadata(file_info["path"])
-
-    # --- Basic file info ---
-    self.file_name_value.setText(file_info["name"])
-    self.file_dim_value.setText(f"{file_info.get('width', '—')}×{file_info.get('height', '—')}")
-    self.file_size_value.setText(f"{file_info['size'] / 1024:.1f} KB")
-    self.file_mod_value.setText(file_info["modified"].strftime("%Y-%m-%d %H:%M"))
-
-    # --- AI metadata ---
-    self.model_value.setText(md.model or "—")
-    self.steps_value.setText(str(md.steps or "—"))
-    self.sampler_value.setText(md.sampler or "—")
-    self.cfg_value.setText(str(md.cfg or "—"))
-    self.seed_value.setText(str(md.seed or "—"))
-    self.prompt_value.setPlainText(md.prompt or "")
-
-    # Optional extras for later tabs:
-    self.right_metadata.setToolTip(f"Workflow: {md.workflow_type}\nControlNets: {', '.join(md.controlnets)}")
 
 
 if __name__ == "__main__":
