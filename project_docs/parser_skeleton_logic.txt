@@ -1,0 +1,78 @@
+
+the parser should go
+
+import blob's dataclass
+
+
+cache_management()
+    check if this file's json is in memory cache, if not write, if yes read it from there.
+
+
+read_json_from_png()
+    this is the actual read from file function if cache is not containing
+    store both workflow and prompt data, and in a dual list/dict format for ewasy access later
+    ***not sure if the dual thing is needed just yet
+    Here we can find the active saveimage and only return data that is being used.
+
+    return blob of json
+
+digest workflow(blob)   #kind of the `main`
+    """we can reuse some of our helpers here, be they new or old."""
+
+    (sampler, scheduler, steps, cfg, guidance, seed) = find_sampler_params()
+    
+    prompt(pos, neg) = find_prompts()
+
+    main_models = find_models()
+        if block to pull out main model
+
+    #we will find upscales and styles later.
+
+
+
+
+
+resolve_sampler_params()
+    scour the json find sampler nodes and read params from them. There are 
+    json workflows that have the scheduler and sampler loaded seperately
+    from the main sampler node, but these are easy to find PLUS they will feed into the main sampler node.
+    
+    #sampler(s) found, read params
+    return (sampler, scheduler, steps, cfg, guidance, seed)
+
+find_prompts()
+    """use our DFS and other logic to roll through json and pick out prompts."""
+    maybe, just maybe, this could be folded into resolve_sampler_params, since in
+    that func we are already accurately traversing the tree.
+
+find_models()
+    """look through active tree (as figured out already) for all loader type nodes.
+    return tagged data like "("fluxSomething.safetensors":"load unet", "NVMM_xxx_whatever.safetensors:"load upscale")
+    in other words pair model file with node type for picking apart later.
+
+
+----------------------------------Oct 22, 2025
+
+Another re-think on node digestion:
+
+First find the right tree, read all nodes and count saveimage nodes. 
+    If more than one
+        match filename of current image to saveimage node. Use that to read rest of tree.
+
+    categorize nodes()
+        match node type (or names) against comfy's NODE_DISPLAY_NAME_MAPPINGS list, which has comments
+        descripbing categorys.
+
+        now there are several lists of nodes:
+
+        sampling
+        loaders
+        conditioning
+
+        latent
+        image
+
+        start with loaders, find CheckpointLoaderSimple and UNETLoader and present them fisrt in the list of models
+        The new way to present MD to mbq is a "models loaded" category. main, CLIP, LoRa, Controlnets
+        
+         in here we find all widgets_values and pair them to

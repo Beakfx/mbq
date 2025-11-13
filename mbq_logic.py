@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QPixmap
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QFileDialog
-from mbq_parser import parse_png_metadata, ImageMetadata
+from mbq_parser import digest_workflow, ImageMetadata
 
 import struct
 import zlib
@@ -70,7 +70,7 @@ class MetaViewLogicMixin:
         self.file_size_value.setText(f"{file_info['size']:,} bytes")
         self.file_mod_value.setText(file_info['modified'].strftime('%Y-%m-%d %H:%M'))
 
-        print(f"🔄 update_metadata called for:",  file_info['name'] )
+        print(f"🔄 the above lines are for:",  file_info['name'], " \n\n")
 
 
 
@@ -90,7 +90,7 @@ class MetaViewLogicMixin:
             prompt_text = (md.prompt or "").strip()
             self.prompt_value.setText(prompt_text or "(no prompt found)")
 
-            print("✅ AI metadata populated")
+            #print("✅ AI metadata populated")
 
         else:
             self.model_value.setText("—")
@@ -248,15 +248,13 @@ class MetaViewLogicMixin:
                 self.load_image_from_path(file_path)
     
 
-from mbq_parser import parse_png_metadata, ImageMetadata
-
 def get_image_metadata(file_path: str) -> ImageMetadata:
     """
     Safe wrapper around parse_png_metadata.
     Falls back to empty metadata if file fails.
     """
     try:
-        return parse_png_metadata(file_path)
+        return digest_workflow(file_path)
     except Exception as e:
         print(f"[mbq_logic] Metadata parse failed for {file_path}: {e}")
         return ImageMetadata(file=file_path)

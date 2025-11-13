@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 )
 from mbq_functions import ImageCanvas
 from PySide6.QtCore import Qt, QTimer, QEvent
-from mbq_parser import parse_png_metadata
+from mbq_parser import digest_workflow
 from mbq_functions import WorkflowCache
 from mbq_logic import MetaViewLogicMixin
 
@@ -279,11 +279,11 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
     def get_workflow_data(self, file_path):
         """Get workflow data using cache"""
-        return self.workflow_cache.get(file_path, parse_png_metadata)
+        return self.workflow_cache.get(file_path, digest_workflow)
     
     def preload_workflows(self, file_paths):
         """Preload workflows for nearby images"""
-        self.workflow_cache.preload_batch(file_paths, parse_png_metadata)
+        self.workflow_cache.preload_batch(file_paths, digest_workflow)
 
 
 if __name__ == "__main__":

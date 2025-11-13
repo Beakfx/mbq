@@ -1,6 +1,6 @@
 
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import List, Optional, Dict
 
@@ -41,6 +41,13 @@ class ImageMetadata:
     parsed_ok: bool = True
     error_message: Optional[str] = None
 
+    def as_dict(self):
+        """Return the dataclass as a regular dict for JSON export."""
+        d = asdict(self)
+        # convert Path → str to avoid json serialization errors
+        d["file"] = str(self.file)
+        return d
+    
     # Pretty-print helper
     def summary(self) -> str:
         """Simple readable summary for CLI or log output"""

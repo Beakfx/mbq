@@ -1,0 +1,14 @@
+------------------------------------------------------------------------------------------------------------------------
+Scanning 1 file(s)...
+
+
+long_prompt.0001.png
+Node ID  Node Type                        Widget/Value                                      
+--------------------------------------------------------------------------------
+10       VAELoader                  FLUX.safetensors
+5        EmptyLatentImage           1536, 1024, 4
+16       KSamplerSelect             euler
+17       BasicScheduler             simple, 20, 1
+12       UNETLoader                 pixelwave_flux1_dev_bf16_03.safetensors, default
+11       DualCLIPLoader             clip_l.safetensors, t5xxl_fp16.safetensors, flux
+6        CLIPTextEncode             against a background grimy run down futuristic Los Angeles, four girls earl...
