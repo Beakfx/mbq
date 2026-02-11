@@ -1,5 +1,7 @@
-import struct, json, zlib
+import struct, json, zlib, sys
 from pathlib import Path
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 def pretty_print_png_json(file_path):
     """Read PNG metadata chunks (prompt/workflow) and print pretty JSON."""
@@ -36,7 +38,7 @@ def pretty_print_png_json(file_path):
                         print(f"\n--- {file_path.name} :: {keyword} ---")
                         try:
                             parsed = json.loads(text)
-                            print(json.dumps(parsed, indent=2, ensure_ascii=False))
+                            print(json.dumps(parsed, indent=2, ensure_ascii=False).rstrip())
                         except json.JSONDecodeError:
                             print(text)
 
@@ -47,6 +49,19 @@ def pretty_print_png_json(file_path):
 
 
 if __name__ == "__main__":
-    folder = Path("images")
-    for png in folder.glob("*.png"):
-        pretty_print_png_json(png)
+    import sys
+
+    if len(sys.argv) > 1:
+        # Parse a single file
+        file_path = Path(sys.argv[1])
+        if file_path.exists():
+            pretty_print_png_json(file_path)
+        else:
+            print(f"[!] File not found: {file_path}")
+    else:
+        # Default behavior: process all PNGs in images/
+        folder = Path("images")
+        for png in folder.glob("*.png"):
+            pretty_print_png_json(png)
+
+

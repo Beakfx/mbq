@@ -4,7 +4,7 @@
 # Uses ComfyUI's own input-graph logic via comfy_exec_core.py
 # to extract model, prompt, and sampler data from PNG tEXt chunks.
 # ---------------------------------------------------------------------
-# Copyright © 2025 Beak11
+# Copyright © 2025 Beak
 # Portions derived from ComfyUI (GPL-3.0)
 # ---------------------------------------------------------------------
 
