@@ -1,0 +1,886 @@
+MBQ TESTSET METADATA DUMP
+=========================
+Input: images
+PNG count: 19
+Full JSON included: False
+
+####################################################################################################
+FILE: ControlNet_00010_upscale.png
+PATH: images\ControlNet_00010_upscale.png
+SIZE: 2048 x 2048
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: controlnet00010upscale
+- prompt node 9: prefix='WIP/more-groupies' | normalized='wipmoregroupies' | startswith_match=False
+- workflow node 9: prefix='WIP/more-groupies' | normalized='wipmoregroupies' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 4
+third_party_nodes: 8
+core node types:
+  - 9: SaveImage
+  - 32: CLIPTextEncode
+  - 28: UpscaleModelLoader
+  - 27: LoadImage
+third-party/unknown node types:
+  - 12: UNETLoader
+  - 30: PreviewImage
+  - 11: DualCLIPLoader
+  - 31: VAELoader
+  - 36: ImageScale
+  - 35: Image Comparer (rgthree)
+  - 26: CLIPTextEncodeFlux
+  - 29: UltimateSDUpscale
+
+####################################################################################################
+FILE: controlnet_i2i_tableLady_00004_.png
+PATH: images\controlnet_i2i_tableLady_00004_.png
+SIZE: 1024 x 768
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: controlneti2itablelady00004
+- prompt node 9: prefix='gend/flux_practice/controlnet_tableLady' | normalized='gendfluxpracticecontrolnettablelady' | startswith_match=False
+- workflow node 9: prefix='gend/flux_practice/controlnet_tableLady' | normalized='gendfluxpracticecontrolnettablelady' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 10
+third_party_nodes: 13
+core node types:
+  - 5: EmptyLatentImage
+  - 36: CLIPTextEncode
+  - 44: EmptyLatentImage
+  - 38: ControlNetLoader
+  - 45: LoadImage
+  - 46: VAEEncode
+  - 8: VAEDecode
+  - 40: LoadImage
+  - 37: KSampler
+  - 9: SaveImage
+third-party/unknown node types:
+  - 25: RandomNoise
+  - 12: UNETLoader
+  - 16: KSamplerSelect
+  - 17: BasicScheduler
+  - 11: DualCLIPLoader
+  - 10: VAELoader
+  - 42: PreviewImage
+  - 41: AIO_Preprocessor
+  - 22: BasicGuider
+  - 39: VAELoader
+  - 47: Image Comparer (rgthree)
+  - 26: CLIPTextEncodeFlux
+  - 35: ControlNetApplyAdvanced
+
+####################################################################################################
+FILE: disc_fix_00006_.png
+PATH: images\disc_fix_00006_.png
+SIZE: 1024 x 768
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: discfix00006
+- prompt node 3: prefix='procd/disc_fix' | normalized='procddiscfix' | startswith_match=False
+- workflow node 3: prefix='procd/disc_fix' | normalized='procddiscfix' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 7
+third_party_nodes: 12
+core node types:
+  - 17: CLIPTextEncode
+  - 2: VAEDecode
+  - 4: LoadImage
+  - 1: KSampler
+  - 20: LoadImage
+  - 3: SaveImage
+  - 5: CLIPTextEncode
+third-party/unknown node types:
+  - 10: InpaintModelConditioning
+  - 11: DifferentialDiffusion
+  - 16: Note
+  - 14: Fast Groups Bypasser (rgthree)
+  - 7: UNETLoader
+  - 9: DualCLIPLoader
+  - 15: InpaintExtendOutpaint
+  - 19: Image Comparer (rgthree)
+  - 8: VAELoader
+  - 13: InpaintStitch
+  - 6: FluxGuidance
+  - 12: InpaintCrop
+
+####################################################################################################
+FILE: disc_fix_new_nodes_00005_.png
+PATH: images\disc_fix_new_nodes_00005_.png
+SIZE: 1024 x 768
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: discfixnewnodes00005
+- prompt node 3: prefix='procd/disc_fix_new_nodes' | normalized='procddiscfixnewnodes' | startswith_match=False
+- workflow node 3: prefix='procd/disc_fix_new_nodes' | normalized='procddiscfixnewnodes' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 7
+third_party_nodes: 15
+core node types:
+  - 17: CLIPTextEncode
+  - 1: KSampler
+  - 4: LoadImage
+  - 20: LoadImage
+  - 2: VAEDecode
+  - 3: SaveImage
+  - 5: CLIPTextEncode
+third-party/unknown node types:
+  - 11: DifferentialDiffusion
+  - 16: Note
+  - 14: Fast Groups Bypasser (rgthree)
+  - 7: UNETLoader
+  - 9: DualCLIPLoader
+  - 15: InpaintExtendOutpaint
+  - 22: InpaintStitchImproved
+  - 21: InpaintCropImproved
+  - 6: FluxGuidance
+  - 8: VAELoader
+  - 10: InpaintModelConditioning
+  - 23: InpaintModelConditioning
+  - 13: InpaintStitch
+  - 19: Image Comparer (rgthree)
+  - 12: InpaintCrop
+
+####################################################################################################
+FILE: dual_controlnet_anime_sd35.png
+PATH: images\dual_controlnet_anime_sd35.png
+SIZE: 768 x 768
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: dualcontrolnetanimesd35
+- prompt node 9: prefix='gend/tests/sd35_dual__controlnets' | normalized='gendtestssd35dualcontrolnets' | startswith_match=False
+- workflow node 9: prefix='gend/tests/sd35_dual__controlnets' | normalized='gendtestssd35dualcontrolnets' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 10
+third_party_nodes: 8
+core node types:
+  - 26: ControlNetLoader
+  - 39: KSampler
+  - 8: VAEDecode
+  - 31: CheckpointLoaderSimple
+  - 21: LoadImage
+  - 27: ControlNetLoader
+  - 9: SaveImage
+  - 7: CLIPTextEncode
+  - 24: CLIPTextEncode
+  - 20: LoadImage
+third-party/unknown node types:
+  - 38: TripleCLIPLoader
+  - 35: EmptySD3LatentImage
+  - 48: PreviewImage
+  - 49: ConditioningZeroOut
+  - 45: ControlNetApplySD3
+  - 47: ControlNetApplySD3
+  - 50: AIO_Preprocessor
+  - 51: PreviewImage
+
+####################################################################################################
+FILE: hand_rescue_00009_.png
+PATH: images\hand_rescue_00009_.png
+SIZE: 1024 x 768
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: handrescue00009
+- prompt node 3: prefix='flux_gen_inp/hand_rescue' | normalized='fluxgeninphandrescue' | startswith_match=False
+- workflow node 3: prefix='flux_gen_inp/hand_rescue' | normalized='fluxgeninphandrescue' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 6
+third_party_nodes: 12
+core node types:
+  - 2: VAEDecode
+  - 17: CLIPTextEncode
+  - 4: LoadImage
+  - 1: KSampler
+  - 5: CLIPTextEncode
+  - 3: SaveImage
+third-party/unknown node types:
+  - 6: FluxGuidance
+  - 9: DualCLIPLoader
+  - 10: InpaintModelConditioning
+  - 11: DifferentialDiffusion
+  - 12: InpaintCrop
+  - 14: Fast Groups Bypasser (rgthree)
+  - 16: Note
+  - 15: InpaintExtendOutpaint
+  - 8: VAELoader
+  - 7: UNETLoader
+  - 13: InpaintStitch
+  - 18: Image Comparer (rgthree)
+
+####################################################################################################
+FILE: inpaint_chain_fix_00001_.png
+PATH: images\inpaint_chain_fix_00001_.png
+SIZE: 1024 x 768
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: inpaintchainfix00001
+- prompt node 3: prefix='procd/disc_face_chain_fix' | normalized='procddiscfacechainfix' | startswith_match=False
+- workflow node 3: prefix='procd/disc_face_chain_fix' | normalized='procddiscfacechainfix' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 7
+third_party_nodes: 12
+core node types:
+  - 17: CLIPTextEncode
+  - 2: VAEDecode
+  - 4: LoadImage
+  - 1: KSampler
+  - 20: LoadImage
+  - 5: CLIPTextEncode
+  - 3: SaveImage
+third-party/unknown node types:
+  - 10: InpaintModelConditioning
+  - 11: DifferentialDiffusion
+  - 16: Note
+  - 14: Fast Groups Bypasser (rgthree)
+  - 7: UNETLoader
+  - 9: DualCLIPLoader
+  - 15: InpaintExtendOutpaint
+  - 19: Image Comparer (rgthree)
+  - 8: VAELoader
+  - 13: InpaintStitch
+  - 12: InpaintCrop
+  - 6: FluxGuidance
+
+####################################################################################################
+FILE: invoke_sample_alley_dog.png
+PATH: images\invoke_sample_alley_dog.png
+SIZE: 1024 x 1024
+####################################################################################################
+prompt_json: no
+workflow_json: no
+RESULT: no prompt/workflow JSON found
+
+####################################################################################################
+FILE: long_prompt.0001.png
+PATH: images\long_prompt.0001.png
+SIZE: 1536 x 1024
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: longprompt0001
+- prompt node 9: prefix='WIP/more-groupies' | normalized='wipmoregroupies' | startswith_match=False
+- workflow node 9: prefix='WIP/more-groupies' | normalized='wipmoregroupies' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 4
+third_party_nodes: 8
+core node types:
+  - 8: VAEDecode
+  - 6: CLIPTextEncode
+  - 5: EmptyLatentImage
+  - 9: SaveImage
+third-party/unknown node types:
+  - 13: SamplerCustomAdvanced
+  - 22: BasicGuider
+  - 16: KSamplerSelect
+  - 25: RandomNoise
+  - 17: BasicScheduler
+  - 11: DualCLIPLoader
+  - 12: UNETLoader
+  - 10: VAELoader
+
+####################################################################################################
+FILE: monkeyvine_DUB_00002_.png
+PATH: images\monkeyvine_DUB_00002_.png
+SIZE: 1024 x 1024
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: monkeyvinedub00002
+- prompt node 9: prefix='gend/monkeyvine/monkeyvine_ref' | normalized='gendmonkeyvinemonkeyvineref' | startswith_match=False
+- prompt node 34: prefix='gend/monkeyvine/monkeyvine_DUB' | normalized='gendmonkeyvinemonkeyvinedub' | startswith_match=False
+- workflow node 9: prefix='gend/monkeyvine/monkeyvine_ref' | normalized='gendmonkeyvinemonkeyvineref' | startswith_match=False
+- workflow node 34: prefix='gend/monkeyvine/monkeyvine_DUB' | normalized='gendmonkeyvinemonkeyvinedub' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 6
+third_party_nodes: 19
+core node types:
+  - 8: VAEDecode
+  - 9: SaveImage
+  - 36: VAEDecode
+  - 5: EmptyLatentImage
+  - 35: EmptyLatentImage
+  - 34: SaveImage
+third-party/unknown node types:
+  - 11: DualCLIPLoader
+  - 22: BasicGuider
+  - 16: KSamplerSelect
+  - 13: SamplerCustomAdvanced
+  - 10: VAELoader
+  - 12: UNETLoader
+  - 17: BasicScheduler
+  - 26: CLIPTextEncodeFlux
+  - 38: DualCLIPLoader
+  - 44: RandomNoise
+  - 41: KSamplerSelect
+  - 42: BasicScheduler
+  - 43: BasicGuider
+  - 40: SamplerCustomAdvanced
+  - 37: VAELoader
+  - 39: UNETLoader
+  - 46: PreviewImage
+  - 25: RandomNoise
+  - 45: CLIPTextEncodeFlux
+
+####################################################################################################
+FILE: multi_save_from_preview_check.png
+PATH: images\multi_save_from_preview_check.png
+SIZE: 1024 x 1024
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: multisavefrompreviewcheck
+- prompt node 9: prefix='gend/monkeyvine/monkeyvine_ref' | normalized='gendmonkeyvinemonkeyvineref' | startswith_match=False
+- prompt node 34: prefix='gend/monkeyvine/monkeyvine_DUB' | normalized='gendmonkeyvinemonkeyvinedub' | startswith_match=False
+- workflow node 9: prefix='gend/monkeyvine/monkeyvine_ref' | normalized='gendmonkeyvinemonkeyvineref' | startswith_match=False
+- workflow node 34: prefix='gend/monkeyvine/monkeyvine_DUB' | normalized='gendmonkeyvinemonkeyvinedub' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 6
+third_party_nodes: 19
+core node types:
+  - 8: VAEDecode
+  - 9: SaveImage
+  - 34: SaveImage
+  - 36: VAEDecode
+  - 5: EmptyLatentImage
+  - 35: EmptyLatentImage
+third-party/unknown node types:
+  - 11: DualCLIPLoader
+  - 22: BasicGuider
+  - 16: KSamplerSelect
+  - 13: SamplerCustomAdvanced
+  - 10: VAELoader
+  - 12: UNETLoader
+  - 17: BasicScheduler
+  - 26: CLIPTextEncodeFlux
+  - 38: DualCLIPLoader
+  - 44: RandomNoise
+  - 41: KSamplerSelect
+  - 42: BasicScheduler
+  - 43: BasicGuider
+  - 40: SamplerCustomAdvanced
+  - 37: VAELoader
+  - 39: UNETLoader
+  - 45: CLIPTextEncodeFlux
+  - 46: PreviewImage
+  - 25: RandomNoise
+
+####################################################################################################
+FILE: one.png
+PATH: images\one.png
+SIZE: 1024 x 1024
+####################################################################################################
+prompt_json: no
+workflow_json: no
+RESULT: no prompt/workflow JSON found
+
+####################################################################################################
+FILE: red_head_3k_00002_.png
+PATH: images\red_head_3k_00002_.png
+SIZE: 3072 x 2048
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: redhead3k00002
+- prompt node 317: prefix='procd/red_head_3k' | normalized='procdredhead3k' | startswith_match=False
+- workflow node 301: prefix='sd3_babe' | normalized='sd3babe' | startswith_match=False
+- workflow node 317: prefix='procd/red_head_3k' | normalized='procdredhead3k' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 10
+third_party_nodes: 14
+core node types:
+  - 8: VAEDecode
+  - 301: SaveImage
+  - 6: CLIPTextEncode
+  - 71: CLIPTextEncode
+  - 69: ConditioningCombine
+  - 302: LoadImage
+  - 4: CheckpointLoaderSimple
+  - 294: KSampler
+  - 304: UpscaleModelLoader
+  - 317: SaveImage
+third-party/unknown node types:
+  - 70: ConditioningSetTimestepRange
+  - 68: ConditioningSetTimestepRange
+  - 105: Note
+  - 67: ConditioningZeroOut
+  - 11: TripleCLIPLoader
+  - 135: EmptySD3LatentImage
+  - 50: PreviewImage
+  - 312: KSamplerSelect
+  - 13: ModelSamplingSD3
+  - 307: ImageScale
+  - 314: DetailDaemonSamplerNode
+  - 311: UltimateSDUpscaleCustomSample
+  - 306: Image Comparer (rgthree)
+  - 316: BasicScheduler
+
+####################################################################################################
+FILE: redux_1_00002_.png
+PATH: images\redux_1_00002_.png
+SIZE: 1024 x 960
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: redux100002
+- prompt node 9: prefix='gend/patio/redux_1' | normalized='gendpatioredux1' | startswith_match=False
+- workflow node 9: prefix='gend/patio/redux_1' | normalized='gendpatioredux1' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 4
+third_party_nodes: 20
+core node types:
+  - 8: VAEDecode
+  - 9: SaveImage
+  - 40: LoadImage
+  - 6: CLIPTextEncode
+third-party/unknown node types:
+  - 17: BasicScheduler
+  - 16: KSamplerSelect
+  - 13: SamplerCustomAdvanced
+  - 25: RandomNoise
+  - 30: ModelSamplingFlux
+  - 34: PrimitiveNode
+  - 37: Note
+  - 28: Note
+  - 22: BasicGuider
+  - 43: Note
+  - 35: PrimitiveNode
+  - 11: DualCLIPLoader
+  - 10: VAELoader
+  - 38: CLIPVisionLoader
+  - 42: StyleModelLoader
+  - 39: CLIPVisionEncode
+  - 12: UNETLoader
+  - 26: FluxGuidance
+  - 41: StyleModelApply
+  - 27: EmptySD3LatentImage
+
+####################################################################################################
+FILE: renamed_outpaint.png
+PATH: images\renamed_outpaint.png
+SIZE: 2048 x 1480
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: renamedoutpaint
+- prompt node 3: prefix='outpaint/950_newtech_vert_even' | normalized='outpaint950newtechverteven' | startswith_match=False
+- workflow node 3: prefix='outpaint/950_newtech_vert_even' | normalized='outpaint950newtechverteven' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 6
+third_party_nodes: 11
+core node types:
+  - 1: KSampler
+  - 2: VAEDecode
+  - 4: LoadImage
+  - 17: CLIPTextEncode
+  - 5: CLIPTextEncode
+  - 3: SaveImage
+third-party/unknown node types:
+  - 6: FluxGuidance
+  - 13: InpaintStitch
+  - 16: Note
+  - 8: VAELoader
+  - 14: Fast Groups Bypasser (rgthree)
+  - 9: DualCLIPLoader
+  - 12: InpaintCrop
+  - 10: InpaintModelConditioning
+  - 7: UNETLoader
+  - 11: DifferentialDiffusion
+  - 15: InpaintExtendOutpaint
+
+####################################################################################################
+FILE: saved_from_preview.png
+PATH: images\saved_from_preview.png
+SIZE: 2048 x 2048
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: savedfrompreview
+- prompt node 9: prefix='WIP/more-groupies' | normalized='wipmoregroupies' | startswith_match=False
+- workflow node 9: prefix='WIP/more-groupies' | normalized='wipmoregroupies' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 4
+third_party_nodes: 8
+core node types:
+  - 32: CLIPTextEncode
+  - 28: UpscaleModelLoader
+  - 27: LoadImage
+  - 9: SaveImage
+third-party/unknown node types:
+  - 12: UNETLoader
+  - 11: DualCLIPLoader
+  - 31: VAELoader
+  - 36: ImageScale
+  - 26: CLIPTextEncodeFlux
+  - 29: UltimateSDUpscale
+  - 30: PreviewImage
+  - 35: Image Comparer (rgthree)
+
+####################################################################################################
+FILE: sd3.5_atm.0001.png
+PATH: images\sd3.5_atm.0001.png
+SIZE: 1024 x 1024
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: sd35atm0001
+- prompt node 301: prefix='gend/ATM_35' | normalized='gendatm35' | startswith_match=False
+- workflow node 301: prefix='gend/ATM_35' | normalized='gendatm35' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 7
+third_party_nodes: 8
+core node types:
+  - 69: ConditioningCombine
+  - 294: KSampler
+  - 4: CheckpointLoaderSimple
+  - 8: VAEDecode
+  - 301: SaveImage
+  - 6: CLIPTextEncode
+  - 71: CLIPTextEncode
+third-party/unknown node types:
+  - 68: ConditioningSetTimestepRange
+  - 67: ConditioningZeroOut
+  - 105: Note
+  - 50: PreviewImage
+  - 13: ModelSamplingSD3
+  - 11: TripleCLIPLoader
+  - 135: EmptySD3LatentImage
+  - 70: ConditioningSetTimestepRange
+
+####################################################################################################
+FILE: source_inpaint_00034_.png
+PATH: images\source_inpaint_00034_.png
+SIZE: 2048 x 1080
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: sourceinpaint00034
+- prompt node 3: prefix='outpaint/source_home' | normalized='outpaintsourcehome' | startswith_match=False
+- workflow node 3: prefix='outpaint/source_home' | normalized='outpaintsourcehome' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 6
+third_party_nodes: 11
+core node types:
+  - 1: KSampler
+  - 2: VAEDecode
+  - 4: LoadImage
+  - 17: CLIPTextEncode
+  - 3: SaveImage
+  - 5: CLIPTextEncode
+third-party/unknown node types:
+  - 8: VAELoader
+  - 10: InpaintModelConditioning
+  - 11: DifferentialDiffusion
+  - 12: InpaintCrop
+  - 13: InpaintStitch
+  - 14: Fast Groups Bypasser (rgthree)
+  - 16: Note
+  - 15: InpaintExtendOutpaint
+  - 7: UNETLoader
+  - 9: DualCLIPLoader
+  - 6: FluxGuidance
+
+####################################################################################################
+FILE: straight_gen_monkeys.png
+PATH: images\straight_gen_monkeys.png
+SIZE: 1024 x 1024
+####################################################################################################
+prompt_json: yes
+workflow_json: yes
+
+SaveImage prefix candidates
+===========================
+normalized filename stem: straightgenmonkeys
+- prompt node 9: prefix='gend/monkeyvine/monkeyvine_ref' | normalized='gendmonkeyvinemonkeyvineref' | startswith_match=False
+- workflow node 9: prefix='gend/monkeyvine/monkeyvine_ref' | normalized='gendmonkeyvinemonkeyvineref' | startswith_match=False
+
+Legacy summary from parse_nodes(workflow_json or prompt_json)
+=============================================================
+{
+  "model": null,
+  "prompt": "",
+  "negative_prompt": "",
+  "sampler": null,
+  "scheduler": null,
+  "steps": null,
+  "cfg": null,
+  "seed": null,
+  "denoise": null
+}
+core_nodes: 3
+third_party_nodes: 9
+core node types:
+  - 8: VAEDecode
+  - 9: SaveImage
+  - 5: EmptyLatentImage
+third-party/unknown node types:
+  - 11: DualCLIPLoader
+  - 22: BasicGuider
+  - 25: RandomNoise
+  - 16: KSamplerSelect
+  - 13: SamplerCustomAdvanced
+  - 10: VAELoader
+  - 12: UNETLoader
+  - 17: BasicScheduler
+  - 26: CLIPTextEncodeFlux

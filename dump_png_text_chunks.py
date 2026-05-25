@@ -63,11 +63,42 @@ def dump_png_text_chunks(path: Path, out_file=None, indent=3):
 
 if __name__ == "__main__":
     import sys
+    from pathlib import Path
+
     if len(sys.argv) < 2:
-        print("Usage: python dump_png_text_chunks.py <file.png> [out.txt]")
+        print("Usage: python dump_png_text_chunks.py <file|dir|glob> [out.txt]")
         sys.exit(1)
 
-    path = Path(sys.argv[1])
+    target = sys.argv[1]
     out_file = Path(sys.argv[2]) if len(sys.argv) > 2 else None
-    dump_png_text_chunks(path, out_file, indent=3)
+
+    paths = []
+
+    p = Path(target)
+
+    if "*" in target or "?" in target:
+        # explicit glob
+        paths = list(Path().glob(target))
+
+    elif p.is_dir():
+        # directory
+        paths = list(p.glob("*.png"))
+
+    elif p.exists():
+        # single file
+        paths = [p]
+
+    else:
+        print(f"No input found: {target}")
+        sys.exit(1)
+
+    if not paths:
+        print("No PNG files found.")
+        sys.exit(1)
+
+    for png in paths:
+        print(f"\n===== {png} =====\n")
+        dump_png_text_chunks(png, out_file=None)
+
+
 

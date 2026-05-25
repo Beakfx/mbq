@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"d:\\\\My Actual Documents\\\\Projects\\\\Code\\\\PyProjects\\\\mb_gui\" -Recurse -File)",
+      "Bash(Select-Object FullName)"
+    ]
+  }
+}
