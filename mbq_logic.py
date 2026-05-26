@@ -65,14 +65,6 @@ def _is_preview_save(filename: str, saveimage_prefixes: list) -> bool:
 class MetaViewLogicMixin:
     """All behavior logic — no UI creation."""
 
-    def wheelEvent(self, event):
-        if event.angleDelta().y() > 0:
-            self.show_prev_image()
-        else:
-            self.show_next_image()
-        event.accept()
-        return super().wheelEvent(event)
-
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Right:
             self.show_next_image()
@@ -114,25 +106,40 @@ class MetaViewLogicMixin:
         else:
             self.file_name_value.setStyleSheet("")
 
-        # Save scroll position if freeze is active
+        # Save scroll position as a fraction so it survives content height changes
         freeze = getattr(self._freeze_scroll_action, 'isChecked', lambda: False)()
-        saved_scroll = self.primary_display.verticalScrollBar().value() if freeze else None
+        if freeze:
+            sb = self.primary_display.verticalScrollBar()
+            saved_scroll = sb.value() / sb.maximum() if sb.maximum() > 0 else 0.0
+        else:
+            saved_scroll = None
 
-        # Always reset tier 3 to collapsed on image change
+        tier3_was_open = self.tier3_display.isVisible()
         self.tier3_display.setVisible(False)
 
         if md and "tiers" in md:
             t1, t2, t3 = md["tiers"]
             primary_html = _build_display_text(t1 + t2)
             if primary_html:
+                if saved_scroll is not None:
+                    self.primary_display.setUpdatesEnabled(False)
                 self.primary_display.setHtml(primary_html)
                 if saved_scroll is not None:
-                    QTimer.singleShot(0, lambda v=saved_scroll: self.primary_display.verticalScrollBar().setValue(v))
+                    def _restore(frac=saved_scroll):
+                        sb = self.primary_display.verticalScrollBar()
+                        sb.setValue(int(sb.maximum() * frac))
+                        self.primary_display.setUpdatesEnabled(True)
+                    QTimer.singleShot(0, _restore)
             else:
                 self.primary_display.setPlainText("(no ComfyUI params in this image)")
             self.tier3_display.setHtml(_build_display_text(t3))
             self._tier3_count = len(t3)
-            self.tier3_btn.setText(f"▶ plumbing ({self._tier3_count} nodes)")
+            if tier3_was_open and self._tier3_count > 0:
+                self.tier3_display.setVisible(True)
+                arrow = "▼"
+            else:
+                arrow = "▶"
+            self.tier3_btn.setText(f'<span style="font-size:18px;">{arrow}</span> plumbing ({self._tier3_count} nodes)')
             self.tier3_btn.setVisible(self._tier3_count > 0)
 
             # Bulbs
@@ -156,7 +163,8 @@ class MetaViewLogicMixin:
         visible = not self.tier3_display.isVisible()
         self.tier3_display.setVisible(visible)
         n = getattr(self, "_tier3_count", 0)
-        self.tier3_btn.setText(f"{'▼' if visible else '▶'} plumbing ({n} nodes)")
+        arrow = "▼" if visible else "▶"
+        self.tier3_btn.setText(f'<span style="font-size:18px;">{arrow}</span> plumbing ({n} nodes)')
 
     def jump_to_index(self, idx):
         self.folder_model.index = idx
@@ -243,9 +251,9 @@ class MetaViewLogicMixin:
         if not self.folder_model:
             return
 
-        filmstrip_height = self.thumb_scroll_area.height()
+        filmstrip_height = self.thumb_area.height()
         thumb_size = filmstrip_height - 20
-        available_width = self.thumb_scroll_area.width()
+        available_width = self.thumb_area.width()
         max_thumbs = max(5, available_width // thumb_size)
 
         center_index = self.folder_model.index

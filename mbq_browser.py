@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QScrollArea, QTextEdit, QMessageBox, QFileDialog,
+    QTextEdit, QMessageBox, QFileDialog,
 )
 from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtCore import Qt, QTimer, QEvent, QUrl
@@ -113,13 +113,12 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         sep.setStyleSheet("color: #252222;")
         filmstrip_layout.addWidget(sep)
 
-        self.thumb_scroll_area = QScrollArea()
-        self.thumb_scroll_area.setWidgetResizable(True)
-        self.thumb_scroll_area.setMinimumHeight(100)
-        self.thumb_container = QWidget()
-        self.thumb_layout = QHBoxLayout(self.thumb_container)
-        self.thumb_scroll_area.setWidget(self.thumb_container)
-        filmstrip_layout.addWidget(self.thumb_scroll_area)
+        self.thumb_area = QFrame()
+        self.thumb_area.setMinimumHeight(100)
+        self.thumb_area.setStyleSheet("QFrame { border: 1px solid #333; border-radius: 2px; }")
+        self.thumb_layout = QHBoxLayout(self.thumb_area)
+        self.thumb_layout.setContentsMargins(0, 0, 0, 0)
+        filmstrip_layout.addWidget(self.thumb_area)
 
         center_layout.addWidget(self.filmstrip_frame, 1, 0)
 
@@ -141,32 +140,24 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
         bulb_style = "color: #888; font-size: 10px;"
 
-        self.bulb_zoom = StatusBulb("Zoom Lock")
-        zoom_lbl = QLabel("Zoom")
-        zoom_lbl.setStyleSheet(bulb_style)
-        zoom_group = QHBoxLayout()
-        zoom_group.setSpacing(4)
-        zoom_group.addWidget(self.bulb_zoom)
-        zoom_group.addWidget(zoom_lbl)
-        btn_layout.addLayout(zoom_group)
+        def _bulb_group(bulb, text):
+            grp = QHBoxLayout()
+            grp.setSpacing(4)
+            lbl = QLabel(text)
+            lbl.setStyleSheet(bulb_style)
+            grp.addWidget(bulb)
+            grp.addWidget(lbl)
+            return grp
 
-        self.bulb_wedge = StatusBulb("Wedge node")
-        wedge_lbl = QLabel("Wedge")
-        wedge_lbl.setStyleSheet(bulb_style)
-        wedge_group = QHBoxLayout()
-        wedge_group.setSpacing(4)
-        wedge_group.addWidget(self.bulb_wedge)
-        wedge_group.addWidget(wedge_lbl)
-        btn_layout.addLayout(wedge_group)
-
+        self.bulb_wedge  = StatusBulb("Wedge node")
+        self.bulb_zoom   = StatusBulb("Zoom Lock")
+        self.bulb_scroll = StatusBulb("Scroll Freeze")
         self.bulb_uncomfy = StatusBulb("UnComfy")
-        uncomfy_lbl = QLabel("UnComfy")
-        uncomfy_lbl.setStyleSheet(bulb_style)
-        uncomfy_group = QHBoxLayout()
-        uncomfy_group.setSpacing(4)
-        uncomfy_group.addWidget(self.bulb_uncomfy)
-        uncomfy_group.addWidget(uncomfy_lbl)
-        btn_layout.addLayout(uncomfy_group)
+
+        btn_layout.addLayout(_bulb_group(self.bulb_wedge,   "Wedge"))
+        btn_layout.addLayout(_bulb_group(self.bulb_zoom,    "Zoom"))
+        btn_layout.addLayout(_bulb_group(self.bulb_scroll,  "Scroll"))
+        btn_layout.addLayout(_bulb_group(self.bulb_uncomfy, "UnComfy"))
 
         center_layout.addWidget(self.button_frame, 2, 0)
 
@@ -189,6 +180,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.file_dim_label  = style_label(QLabel("Dimensions:"))
         self.file_size_label = style_label(QLabel("Size:"))
         self.file_mod_label  = style_label(QLabel("Modified:"))
+        self.file_zoom_label = style_label(QLabel("Zoom:"))
 
         _sel = Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
         self.file_name_value = QLabel("—")
@@ -199,6 +191,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.file_size_value.setTextInteractionFlags(_sel)
         self.file_mod_value  = QLabel("—")
         self.file_mod_value.setTextInteractionFlags(_sel)
+        self.file_zoom_value = QLabel("—")
 
         file_grid = QGridLayout()
         file_grid.setHorizontalSpacing(8)
@@ -212,6 +205,8 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         file_grid.addWidget(self.file_size_value, 2, 1)
         file_grid.addWidget(self.file_mod_label,  3, 0)
         file_grid.addWidget(self.file_mod_value,  3, 1)
+        file_grid.addWidget(self.file_zoom_label, 4, 0)
+        file_grid.addWidget(self.file_zoom_value, 4, 1)
         metadata_vbox.addLayout(file_grid)
 
         sep = QFrame()
@@ -226,10 +221,12 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.primary_display.setStyleSheet(mono_style)
         metadata_vbox.addWidget(self.primary_display, stretch=1)
 
-        self.tier3_btn = QPushButton("▶ plumbing")
-        self.tier3_btn.setStyleSheet("text-align: left; padding: 2px 6px; font-size: 10px;")
+        self.tier3_btn = QLabel()
+        self.tier3_btn.setTextFormat(Qt.RichText)
+        self.tier3_btn.setStyleSheet("padding: 2px 6px; font-size: 12px;")
+        self.tier3_btn.setCursor(Qt.PointingHandCursor)
         self.tier3_btn.setVisible(False)
-        self.tier3_btn.clicked.connect(self.toggle_tier3)
+        self.tier3_btn.mousePressEvent = lambda _: self.toggle_tier3()
         metadata_vbox.addWidget(self.tier3_btn)
 
         self.tier3_display = QTextEdit()
@@ -268,9 +265,14 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self._lock_zoom_action = QAction("Lock Zoom", self, checkable=True, shortcut="Z")
         self._lock_zoom_action.toggled.connect(self._on_zoom_lock_toggled)
         view_menu.addAction(self._lock_zoom_action)
-        view_menu.addAction("Reset Zoom", self.image_view.reset_zoom)
+        reset_zoom_action = QAction("Reset Zoom", self, shortcut="R")
+        reset_zoom_action.triggered.connect(self.image_view.reset_zoom)
+        view_menu.addAction(reset_zoom_action)
         view_menu.addSeparator()
         self._freeze_scroll_action = QAction("Freeze Scroll", self, checkable=True, shortcut="S")
+        self._freeze_scroll_action.toggled.connect(
+            lambda checked: self.bulb_scroll.set_state("on" if checked else "off")
+        )
         view_menu.addAction(self._freeze_scroll_action)
 
         # About
@@ -286,6 +288,10 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
         QTimer.singleShot(100, self.initialize_scale)
         self.installEventFilter(self)
+
+        zoom_timer = QTimer(self)
+        zoom_timer.timeout.connect(self._update_zoom_readout)
+        zoom_timer.start(150)
 
     # ---- Menu handlers ----
 
@@ -344,6 +350,10 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
                 self.keyPressEvent(event)
                 return True
         return super().eventFilter(obj, event)
+
+    def _update_zoom_readout(self):
+        pct = self.image_view.transform().m11() * 100
+        self.file_zoom_value.setText(f"{round(pct / 5) * 5}%")
 
     # ---- Cache helpers ----
 

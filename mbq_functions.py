@@ -118,8 +118,7 @@ class ImageCanvas(QGraphicsView):
 
         self.zoom_locked = False
         self._pan_start = None
-        self._zoom_start_y = None
-        self._zoom_drag_dist = 0
+        self._middle_press_pos = None
         self._zoom_anchor_vp = None
         self._zoom_anchor_scene = None
 
@@ -143,48 +142,47 @@ class ImageCanvas(QGraphicsView):
         self.verticalScrollBar().setValue(self.verticalScrollBar().value() + delta.y())
 
     def wheelEvent(self, event):
-        event.ignore()  # propagate to main window for image navigation
+        if event.angleDelta().y() == 0:
+            event.ignore()
+            return
+        self._zoom_anchor_vp = event.position().toPoint()
+        self._zoom_anchor_scene = self.mapToScene(self._zoom_anchor_vp)
+        factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
+        self._zoom_at(factor)
+        event.accept()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MiddleButton:
+        if event.button() == Qt.LeftButton:
             self._pan_start = event.position().toPoint()
             self.setCursor(Qt.ClosedHandCursor)
             event.accept()
-        elif event.button() == Qt.RightButton:
-            self._zoom_start_y = event.position().toPoint().y()
-            self._zoom_anchor_vp = event.position().toPoint()
-            self._zoom_anchor_scene = self.mapToScene(self._zoom_anchor_vp)
-            self._zoom_drag_dist = 0
+        elif event.button() == Qt.MiddleButton:
+            self._middle_press_pos = event.position().toPoint()
             event.accept()
         else:
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.MiddleButton and self._pan_start is not None:
+        if event.buttons() & Qt.LeftButton and self._pan_start is not None:
             delta = event.position().toPoint() - self._pan_start
             self._pan_start = event.position().toPoint()
             self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
             event.accept()
-        elif event.buttons() & Qt.RightButton and self._zoom_start_y is not None:
-            dy = self._zoom_start_y - event.position().toPoint().y()
-            self._zoom_start_y = event.position().toPoint().y()
-            self._zoom_drag_dist += abs(dy)
-            self._zoom_at(1.0 + dy * 0.006)
-            event.accept()
         else:
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MiddleButton:
+        if event.button() == Qt.LeftButton:
             self._pan_start = None
             self.setCursor(Qt.ArrowCursor)
             event.accept()
-        elif event.button() == Qt.RightButton:
-            if self._zoom_drag_dist < 4 and self.image_item:
-                self.fitInView(self.image_item.boundingRect(), Qt.KeepAspectRatio)
-            self._zoom_start_y = None
-            self._zoom_drag_dist = 0
+        elif event.button() == Qt.MiddleButton:
+            if self._middle_press_pos is not None:
+                delta = event.position().toPoint() - self._middle_press_pos
+                if delta.manhattanLength() <= 6:
+                    self.reset_zoom()
+            self._middle_press_pos = None
             event.accept()
         else:
             super().mouseReleaseEvent(event)
@@ -233,7 +231,8 @@ class ImageCanvas(QGraphicsView):
             self.setTransform(saved_transform)
             self.centerOn(saved_center)
         else:
-            self.fitInView(rect, Qt.KeepAspectRatio)
+            self.resetTransform()   # 1:1 (100%)
+            self.centerOn(rect.center())
         self.viewport().update()
 
     def load_image(self, path: str):
@@ -246,7 +245,8 @@ class ImageCanvas(QGraphicsView):
 
     def reset_zoom(self):
         if self.image_item:
-            self.fitInView(self.image_item.boundingRect(), Qt.KeepAspectRatio)
+            self.resetTransform()
+            self.centerOn(self.image_item.boundingRect().center())
 
 
 
