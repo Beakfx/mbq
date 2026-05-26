@@ -2,7 +2,7 @@ import html as _html
 import os
 import re
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap, QPainter
 from PySide6.QtWidgets import QFileDialog, QLabel
 from mbq_functions import ImageFolder
@@ -108,10 +108,15 @@ class MetaViewLogicMixin:
         md = self.get_workflow_data(file_info["path"])
 
         prefixes = md.get("saveimage_prefixes", []) if md else []
-        if md and prefixes and _is_preview_save(file_info["name"], prefixes):
+        is_preview = bool(md and prefixes and _is_preview_save(file_info["name"], prefixes))
+        if is_preview:
             self.file_name_value.setStyleSheet("color: #c8823a;")  # amber — possible preview save
         else:
             self.file_name_value.setStyleSheet("")
+
+        # Save scroll position if freeze is active
+        freeze = getattr(self._freeze_scroll_action, 'isChecked', lambda: False)()
+        saved_scroll = self.primary_display.verticalScrollBar().value() if freeze else None
 
         # Always reset tier 3 to collapsed on image change
         self.tier3_display.setVisible(False)
@@ -121,17 +126,31 @@ class MetaViewLogicMixin:
             primary_html = _build_display_text(t1 + t2)
             if primary_html:
                 self.primary_display.setHtml(primary_html)
+                if saved_scroll is not None:
+                    QTimer.singleShot(0, lambda v=saved_scroll: self.primary_display.verticalScrollBar().setValue(v))
             else:
                 self.primary_display.setPlainText("(no ComfyUI params in this image)")
             self.tier3_display.setHtml(_build_display_text(t3))
             self._tier3_count = len(t3)
             self.tier3_btn.setText(f"▶ plumbing ({self._tier3_count} nodes)")
             self.tier3_btn.setVisible(self._tier3_count > 0)
+
+            # Bulbs
+            self.bulb_uncomfy.set_state("warn" if is_preview else "off")
+            has_wedge = any(
+                "wedge" in n["class_type"].lower() or "wedge" in n["title"].lower()
+                for n in t1 + t2 + t3
+            )
+            self.bulb_wedge.set_state("on" if has_wedge else "off")
         else:
             self.primary_display.setPlainText("(no ComfyUI metadata)")
             self.tier3_display.setPlainText("")
             self._tier3_count = 0
             self.tier3_btn.setVisible(False)
+
+            # Bulbs
+            self.bulb_uncomfy.set_state("warn")
+            self.bulb_wedge.set_state("off")
 
     def toggle_tier3(self):
         visible = not self.tier3_display.isVisible()
@@ -147,6 +166,17 @@ class MetaViewLogicMixin:
             self.update_metadata(current)
             self.populate_filmstrip()
             self.preload_adjacent_images()
+
+    def load_folder_from_path(self, folder_path):
+        self.folder_model = ImageFolder(folder_path)
+        self.image_cache.clear()
+        self.thumb_cache.clear()
+        current = self.folder_model.current()
+        if current:
+            self.display_image(current["path"])
+            self.update_metadata(current)
+        self.populate_filmstrip()
+        self.preload_adjacent_images()
 
     def load_image_from_path(self, file_path):
         folder = os.path.dirname(file_path)

@@ -244,6 +244,10 @@ class ImageCanvas(QGraphicsView):
     def load_image_from_pixmap(self, pixmap: QPixmap):
         self._show_pixmap(pixmap)
 
+    def reset_zoom(self):
+        if self.image_item:
+            self.fitInView(self.image_item.boundingRect(), Qt.KeepAspectRatio)
+
 
 
 # formerly workflow_cache.py
