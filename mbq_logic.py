@@ -1,23 +1,75 @@
-# metaview_logic.py
-from PySide6.QtCore import Qt
-from mbq_functions import ImageFolder
-from PySide6.QtWidgets import QLabel
-from PySide6.QtGui import QPixmap, QPainter
-from PySide6.QtWidgets import QFileDialog
-from mbq_parser import digest_workflow, ImageMetadata
-
+import html as _html
 import os
+import re
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap, QPainter
+from PySide6.QtWidgets import QFileDialog, QLabel
+from mbq_functions import ImageFolder
+from mbq_parser import get_png_metadata
+
+
+# --- display colours (tweak here) ---
+C_NODE_HEADER = "#7ec8e3"   # node class name — muted cyan
+C_NODE_TITLE  = "#888888"   # (title) suffix — mid grey
+C_PARAM_KEY   = "#c8b86e"   # param key      — low yellow
+C_PARAM_VALUE = "#dddddd"   # param value    — near-white
+
+
+def _format_node_block(entry: dict) -> str:
+    """Format one node entry as an HTML fragment."""
+    ctype = entry["class_type"]
+    title = entry["title"]
+    params = entry["params"]
+
+    h = _html.escape(ctype)
+    if title and title.lower().replace(" ", "") != ctype.lower().replace(" ", ""):
+        h += f' <span style="color:{C_NODE_TITLE};">({_html.escape(title)})</span>'
+
+    lines = [f'<b style="color:{C_NODE_HEADER};">{h}</b>']
+    for k, v in params.items():
+        if isinstance(v, float):
+            val = f"{v:g}"
+        elif isinstance(v, list):
+            r = repr(v)
+            val = r[:60] + ("..." if len(r) > 60 else "")
+        else:
+            val = str(v)
+        ek = _html.escape(k)
+        ev = _html.escape(val)
+        lines.append(
+            f'&nbsp;&nbsp;<span style="color:{C_PARAM_KEY};">{ek}:</span>'
+            f' <span style="color:{C_PARAM_VALUE};">{ev}</span>'
+        )
+
+    return "<br>".join(lines)
+
+
+def _build_display_text(nodes: list) -> str:
+    if not nodes:
+        return ""
+    blocks = "<br><br>".join(_format_node_block(n) for n in nodes)
+    return f"<html><body>{blocks}</body></html>"
+
+
+def _is_preview_save(filename: str, saveimage_prefixes: list) -> bool:
+    """Heuristic: True if filename doesn't look like a SaveImage output."""
+    if re.search(r'_\d+_\.\w+$', filename):
+        return False
+    for prefix in saveimage_prefixes:
+        if filename.startswith(prefix):
+            return False
+    return True
 
 
 class MetaViewLogicMixin:
-    """All the behavior logic goes here - no UI creation"""
+    """All behavior logic — no UI creation."""
 
     def wheelEvent(self, event):
         if event.angleDelta().y() > 0:
             self.show_prev_image()
         else:
             self.show_next_image()
-
         event.accept()
         return super().wheelEvent(event)
 
@@ -32,82 +84,78 @@ class MetaViewLogicMixin:
             super().keyPressEvent(event)
 
     def initialize_scale(self):
-        """Initialize after UI is fully built"""
         self.update_scale_factor()
         if self.folder_model:
             self.populate_filmstrip()
 
     def update_scale_factor(self):
-        """Calculate scale factor based on current image view size"""
         if not hasattr(self, "image_view"):
             return
-
         avail_w = self.image_view.width()
         avail_h = self.image_view.height()
-
-        scale_w = avail_w / self.design_canvas_w
-        scale_h = avail_h / self.design_canvas_h
-        self.scale_factor = min(scale_w, scale_h)
+        self.scale_factor = min(avail_w / self.design_canvas_w, avail_h / self.design_canvas_h)
 
     def update_metadata(self, file_info):
-        """Update metadata panel with file info and AI parameters"""
-
-        self.file_name_value.setText(file_info['name'])
-        if 'width' in file_info and 'height' in file_info:
+        """Update the metadata panel for the current image."""
+        self.file_name_value.setText(file_info["name"])
+        if "width" in file_info and "height" in file_info:
             self.file_dim_value.setText(f"{file_info['width']} x {file_info['height']} px")
         else:
             self.file_dim_value.setText("—")
         self.file_size_value.setText(f"{file_info['size']:,} bytes")
-        self.file_mod_value.setText(file_info['modified'].strftime('%Y-%m-%d %H:%M'))
+        self.file_mod_value.setText(file_info["modified"].strftime("%Y-%m-%d %H:%M"))
 
-        workflow_data = self.get_workflow_data(file_info['path'])
+        md = self.get_workflow_data(file_info["path"])
 
-        if workflow_data and getattr(workflow_data, "trusted_workflow", False):
-            md = workflow_data
-
-            self.model_value.setText(md.model or "—")
-            self.steps_value.setText(str(md.steps) if md.steps is not None else "—")
-
-            sampler_bits = []
-            if md.sampler:
-                sampler_bits.append(md.sampler)
-            if md.scheduler:
-                sampler_bits.append(md.scheduler)
-            self.sampler_value.setText(" / ".join(sampler_bits) if sampler_bits else "—")
-
-            self.cfg_value.setText(str(md.cfg) if md.cfg is not None else "—")
-            self.seed_value.setText(str(md.seed) if md.seed is not None else "—")
-
-            prompt_text = (md.prompt or "").strip()
-            neg_prompt_text = (md.negative_prompt or "").strip()
-
-            if md.matched_saveimage_prefix:
-                header = f"[trusted: {md.matched_saveimage_prefix}]"
-                self.prompt_value.setText((header + "\n\n" + (prompt_text or "(no prompt found)")).strip())
-            else:
-                self.prompt_value.setText(prompt_text or "(no prompt found)")
-
-            self.neg_prompt_value.setText(neg_prompt_text or "(no negative prompt found)")
-
+        prefixes = md.get("saveimage_prefixes", []) if md else []
+        if md and prefixes and _is_preview_save(file_info["name"], prefixes):
+            self.file_name_value.setStyleSheet("color: #c8823a;")  # amber — possible preview save
         else:
-            reason = getattr(workflow_data, "ambiguity_reason", None) or "No workflow data"
-            self.model_value.setText("—")
-            self.steps_value.setText("—")
-            self.sampler_value.setText("—")
-            self.cfg_value.setText("—")
-            self.seed_value.setText("—")
-            self.prompt_value.setText(reason)
-            self.neg_prompt_value.setText("—")
-            print(f"❌ {reason}")
+            self.file_name_value.setStyleSheet("")
+
+        # Always reset tier 3 to collapsed on image change
+        self.tier3_display.setVisible(False)
+
+        if md and "tiers" in md:
+            t1, t2, t3 = md["tiers"]
+            primary_html = _build_display_text(t1 + t2)
+            if primary_html:
+                self.primary_display.setHtml(primary_html)
+            else:
+                self.primary_display.setPlainText("(no ComfyUI params in this image)")
+            self.tier3_display.setHtml(_build_display_text(t3))
+            self._tier3_count = len(t3)
+            self.tier3_btn.setText(f"▶ plumbing ({self._tier3_count} nodes)")
+            self.tier3_btn.setVisible(self._tier3_count > 0)
+        else:
+            self.primary_display.setPlainText("(no ComfyUI metadata)")
+            self.tier3_display.setPlainText("")
+            self._tier3_count = 0
+            self.tier3_btn.setVisible(False)
+
+    def toggle_tier3(self):
+        visible = not self.tier3_display.isVisible()
+        self.tier3_display.setVisible(visible)
+        n = getattr(self, "_tier3_count", 0)
+        self.tier3_btn.setText(f"{'▼' if visible else '▶'} plumbing ({n} nodes)")
+
+    def jump_to_index(self, idx):
+        self.folder_model.index = idx
+        current = self.folder_model.current()
+        if current:
+            self.display_image(current["path"])
+            self.update_metadata(current)
+            self.populate_filmstrip()
+            self.preload_adjacent_images()
 
     def load_image_from_path(self, file_path):
         folder = os.path.dirname(file_path)
         self.folder_model = ImageFolder(folder, start_file=file_path)
         self.image_cache.clear()
+        self.thumb_cache.clear()
 
         current = self.folder_model.current()
         if current:
-            print("Displaying:", current["name"])
             self.display_image(current["path"])
             self.update_metadata(current)
         self.populate_filmstrip()
@@ -116,10 +164,8 @@ class MetaViewLogicMixin:
     def preload_adjacent_images(self):
         if not self.folder_model or not self.folder_model.files:
             return
-
         files = self.folder_model.files
         current_idx = self.folder_model.index
-
         for offset in range(-2, 3):
             if offset == 0:
                 continue
@@ -185,31 +231,28 @@ class MetaViewLogicMixin:
             actual_idx = idx % len(files)
             file_path = files[actual_idx]["path"]
 
-            pix = QPixmap(file_path).scaled(
-                thumb_size, thumb_size,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-
-            final_pix = QPixmap(thumb_size, thumb_size)
-            final_pix.fill(Qt.black)
-
-            painter = QPainter(final_pix)
-            x_offset = (thumb_size - pix.width()) // 2
-            y_offset = (thumb_size - pix.height()) // 2
-            painter.drawPixmap(x_offset, y_offset, pix)
-            painter.end()
+            cache_key = (file_path, thumb_size)
+            if cache_key not in self.thumb_cache:
+                pix = QPixmap(file_path).scaled(
+                    thumb_size, thumb_size,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+                final_pix = QPixmap(thumb_size, thumb_size)
+                final_pix.fill(Qt.black)
+                painter = QPainter(final_pix)
+                painter.drawPixmap((thumb_size - pix.width()) // 2, (thumb_size - pix.height()) // 2, pix)
+                painter.end()
+                self.thumb_cache[cache_key] = final_pix
+            final_pix = self.thumb_cache[cache_key]
 
             lbl = QLabel()
             lbl.setPixmap(final_pix)
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setFixedSize(thumb_size, thumb_size)
-
-            if actual_idx == center_index:
-                lbl.setStyleSheet("border: 2px solid #22aa33;")
-            else:
-                lbl.setStyleSheet("border: 1px solid #444;")
-
+            lbl.setStyleSheet("border: 2px solid #22aa33;" if actual_idx == center_index else "border: 1px solid #444;")
+            lbl.setCursor(Qt.PointingHandCursor)
+            lbl.mousePressEvent = lambda e, idx=actual_idx: self.jump_to_index(idx)
             self.thumb_layout.addWidget(lbl)
 
     def open_image_file(self):
@@ -217,21 +260,7 @@ class MetaViewLogicMixin:
         file_dialog.setWindowTitle("Open Image File")
         file_dialog.setNameFilter("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp)")
         file_dialog.setFileMode(QFileDialog.ExistingFile)
-
         if file_dialog.exec():
-            selected_files = file_dialog.selectedFiles()
-            if selected_files:
-                file_path = selected_files[0]
-                self.load_image_from_path(file_path)
-
-
-def get_image_metadata(file_path: str) -> ImageMetadata:
-    try:
-        return digest_workflow(file_path)
-    except Exception as e:
-        print(f"[mbq_logic] Metadata parse failed for {file_path}: {e}")
-        md = ImageMetadata(file=file_path)
-        md.parsed_ok = False
-        md.trust_status = "error"
-        md.ambiguity_reason = f"Metadata parse failed: {e}"
-        return md
+            selected = file_dialog.selectedFiles()
+            if selected:
+                self.load_image_from_path(selected[0])

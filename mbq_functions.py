@@ -98,47 +98,96 @@ class ImageFolder:
 """this defines the 'canvas' class, meaning the area where images are dropped and displayed"""
 
 class ImageCanvas(QGraphicsView):
-    # Signal emitted when a valid file is dropped
     fileDropped = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # Scene holds the content
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
-
-        # Make background black
         self.setBackgroundBrush(Qt.black)
-
-        # Enable drag & drop
         self.setAcceptDrops(True)
-
-        # Disable scrollbars (optional)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-        # Keep track of current image
         self.image_item: QGraphicsPixmapItem | None = None
-
-        # Make them nice to look at
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setRenderHint(QPainter.SmoothPixmapTransform, True)
-        
-        self.setViewport(QOpenGLWidget())  # Hardware-accelerated rendering
-
-     # Enable keyboard focus for the canvas
+        self.setViewport(QOpenGLWidget())
         self.setFocusPolicy(Qt.StrongFocus)
+        self.setTransformationAnchor(QGraphicsView.NoAnchor)
+
+        self.zoom_locked = False
+        self._pan_start = None
+        self._zoom_start_y = None
+        self._zoom_drag_dist = 0
+        self._zoom_anchor_vp = None
+        self._zoom_anchor_scene = None
 
     def keyPressEvent(self, event):
-        """Forward arrow keys to main window for navigation"""
         if event.key() in (Qt.Key_Right, Qt.Key_Left):
-            main_window = self.window()  # Get the actual main window, not just the immediate parent
+            main_window = self.window()
             if main_window:
                 main_window.keyPressEvent(event)
             event.accept()
         else:
             super().keyPressEvent(event)
+
+    def _zoom_at(self, factor: float):
+        if not (0.02 < self.transform().m11() * factor < 100.0):
+            return
+        self.scale(factor, factor)
+        # Keep the press-point anchor fixed in the viewport
+        new_vp = self.mapFromScene(self._zoom_anchor_scene)
+        delta = new_vp - self._zoom_anchor_vp
+        self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() + delta.x())
+        self.verticalScrollBar().setValue(self.verticalScrollBar().value() + delta.y())
+
+    def wheelEvent(self, event):
+        event.ignore()  # propagate to main window for image navigation
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            self._pan_start = event.position().toPoint()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+        elif event.button() == Qt.RightButton:
+            self._zoom_start_y = event.position().toPoint().y()
+            self._zoom_anchor_vp = event.position().toPoint()
+            self._zoom_anchor_scene = self.mapToScene(self._zoom_anchor_vp)
+            self._zoom_drag_dist = 0
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.MiddleButton and self._pan_start is not None:
+            delta = event.position().toPoint() - self._pan_start
+            self._pan_start = event.position().toPoint()
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+            event.accept()
+        elif event.buttons() & Qt.RightButton and self._zoom_start_y is not None:
+            dy = self._zoom_start_y - event.position().toPoint().y()
+            self._zoom_start_y = event.position().toPoint().y()
+            self._zoom_drag_dist += abs(dy)
+            self._zoom_at(1.0 + dy * 0.006)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            self._pan_start = None
+            self.setCursor(Qt.ArrowCursor)
+            event.accept()
+        elif event.button() == Qt.RightButton:
+            if self._zoom_drag_dist < 4 and self.image_item:
+                self.fitInView(self.image_item.boundingRect(), Qt.KeepAspectRatio)
+            self._zoom_start_y = None
+            self._zoom_drag_dist = 0
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
 
     # --- Drag & Drop Events ---
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -167,54 +216,33 @@ class ImageCanvas(QGraphicsView):
         event.ignore()
 
     # --- Image Handling ---
+    def _show_pixmap(self, pixmap: QPixmap):
+        if self.zoom_locked:
+            saved_transform = self.transform()
+            saved_center = self.mapToScene(self.viewport().rect().center())
+
+        self.scene.clear()
+        self.image_item = QGraphicsPixmapItem(pixmap)
+        self.image_item.setTransformationMode(Qt.SmoothTransformation)
+        self.scene.addItem(self.image_item)
+        rect = self.image_item.boundingRect()
+        pad = max(rect.width(), rect.height()) * 2
+        self.scene.setSceneRect(rect.adjusted(-pad, -pad, pad, pad))
+
+        if self.zoom_locked:
+            self.setTransform(saved_transform)
+            self.centerOn(saved_center)
+        else:
+            self.fitInView(rect, Qt.KeepAspectRatio)
+        self.viewport().update()
+
     def load_image(self, path: str):
         pixmap = QPixmap(path)
-        if pixmap.isNull():
-            print(f"Failed to load image: {path}")
-            return
+        if not pixmap.isNull():
+            self._show_pixmap(pixmap)
 
-        print(f"Original: {pixmap.width()}x{pixmap.height()}")
-        print(f"Viewport: {self.viewport().width()}x{self.viewport().height()}")
-
-        self.scene.clear()
-
-        # Add the original pixmap without pre-scaling
-        self.image_item = QGraphicsPixmapItem(pixmap)
-        self.image_item.setTransformationMode(Qt.SmoothTransformation)
-        self.scene.addItem(self.image_item)
-
-        # Set scene rect to exact image size
-        rect = self.image_item.boundingRect()
-        self.scene.setSceneRect(rect)
-        
-        # Let fitInView handle all scaling consistently
-        self.fitInView(rect, Qt.KeepAspectRatio)
-        
-        # Force update to ensure smooth rendering
-        self.viewport().update()
-
-#        print(f"Displayed scene rect: {rect.width()}x{rect.height()}")
-
-    # ← ADD THIS NEW METHOD FOR CACHING
-    def load_image_from_pixmap(self, pixmap):
-        """Load already-loaded pixmap (for cache) - FIXED VERSION"""
-        self.scene.clear()
-
-        # Add the original pixmap without pre-scaling
-        self.image_item = QGraphicsPixmapItem(pixmap)
-        self.image_item.setTransformationMode(Qt.SmoothTransformation)
-        self.scene.addItem(self.image_item)
-
-        # Set scene rect to exact image size
-        self.scene.setSceneRect(self.image_item.boundingRect())
-        
-        # Let fitInView handle the scaling (consistent with load_image)
-        self.fitInView(self.image_item, Qt.KeepAspectRatio)
-        
-        # Force update
-        self.viewport().update()
-        
-#        print(f"Cached image displayed at: {self.image_item.boundingRect().width()}x{self.image_item.boundingRect().height()}")
+    def load_image_from_pixmap(self, pixmap: QPixmap):
+        self._show_pixmap(pixmap)
 
 
 

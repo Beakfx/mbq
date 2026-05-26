@@ -2,11 +2,12 @@
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QScrollArea, QTextEdit, QSizePolicy
+    QScrollArea, QTextEdit,
 )
+from PySide6.QtGui import QAction
 from mbq_functions import ImageCanvas
 from PySide6.QtCore import Qt, QTimer, QEvent
-from mbq_parser import digest_workflow
+from mbq_parser import get_png_metadata
 from mbq_functions import WorkflowCache
 from mbq_logic import MetaViewLogicMixin
 
@@ -29,6 +30,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         
         self.folder_model = None
         self.image_cache = {}
+        self.thumb_cache = {}
         self.cache_size = 5
 
         # --- Design reference sizes for 4:3 ---
@@ -131,108 +133,94 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
         # --- Right Metadata Panel ---
         self.right_metadata = QGroupBox("Metadata")
-        self.right_metadata.setMinimumWidth(300)  # ~1/4 of window width
+        self.right_metadata.setMinimumWidth(300)
 
-        # Use a grid layout instead of VBox
-        metadata_layout = QGridLayout()
-        metadata_layout.setHorizontalSpacing(8)
-        metadata_layout.setVerticalSpacing(6)      # tighter rows
-        metadata_layout.setContentsMargins(8, 8, 8, 8)
-        self.right_metadata.setLayout(metadata_layout)
+        metadata_vbox = QVBoxLayout()
+        metadata_vbox.setContentsMargins(8, 8, 8, 8)
+        metadata_vbox.setSpacing(4)
+        self.right_metadata.setLayout(metadata_vbox)
 
-        # Compact labels
         label_style = "color: #888; font-size: 11px;"
 
         def style_label(lbl):
             lbl.setStyleSheet(label_style)
             return lbl
 
-        # --- File Info ---
+        # --- File Info (compact grid) ---
         self.file_name_label = style_label(QLabel("File:"))
-        self.file_dim_label = style_label(QLabel("Dimensions:"))
+        self.file_dim_label  = style_label(QLabel("Dimensions:"))
         self.file_size_label = style_label(QLabel("Size:"))
-        self.file_mod_label = style_label(QLabel("Modified:"))
-        self.model_label    = style_label(QLabel("Model:"))
-        self.steps_label    = style_label(QLabel("Steps:"))
-        self.sampler_label  = style_label(QLabel("Sampler:"))
-        self.cfg_label      = style_label(QLabel("CFG:"))
-        self.seed_label     = style_label(QLabel("Seed:"))
-        self.prompt_label   = style_label(QLabel("Prompt:"))
+        self.file_mod_label  = style_label(QLabel("Modified:"))
 
-
+        _sel = Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
         self.file_name_value = QLabel("—")
-        self.file_dim_value = QLabel("—")
+        self.file_name_value.setTextInteractionFlags(_sel)
+        self.file_dim_value  = QLabel("—")
+        self.file_dim_value.setTextInteractionFlags(_sel)
         self.file_size_value = QLabel("—")
-        self.file_mod_value = QLabel("—")
+        self.file_size_value.setTextInteractionFlags(_sel)
+        self.file_mod_value  = QLabel("—")
+        self.file_mod_value.setTextInteractionFlags(_sel)
 
-        metadata_layout.addWidget(self.file_name_label, 0, 0)
-        metadata_layout.addWidget(self.file_name_value, 0, 1)
-        metadata_layout.addWidget(self.file_dim_label, 1, 0)
-        metadata_layout.addWidget(self.file_dim_value, 1, 1)
-        metadata_layout.addWidget(self.file_size_label, 2, 0)
-        metadata_layout.addWidget(self.file_size_value, 2, 1)
-        metadata_layout.addWidget(self.file_mod_label, 3, 0)
-        metadata_layout.addWidget(self.file_mod_value, 3, 1)
+        file_grid = QGridLayout()
+        file_grid.setHorizontalSpacing(8)
+        file_grid.setVerticalSpacing(4)
+        file_grid.setContentsMargins(0, 0, 0, 0)
+        file_grid.addWidget(self.file_name_label, 0, 0)
+        file_grid.addWidget(self.file_name_value, 0, 1)
+        file_grid.addWidget(self.file_dim_label,  1, 0)
+        file_grid.addWidget(self.file_dim_value,  1, 1)
+        file_grid.addWidget(self.file_size_label, 2, 0)
+        file_grid.addWidget(self.file_size_value, 2, 1)
+        file_grid.addWidget(self.file_mod_label,  3, 0)
+        file_grid.addWidget(self.file_mod_value,  3, 1)
+        metadata_vbox.addLayout(file_grid)
 
-        metadata_layout.setRowMinimumHeight(4, 12)  # 12px gap
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet("color: #333;")
+        metadata_vbox.addWidget(sep)
 
-        self.model_value = QLabel("—")
-        self.steps_value = QLabel("—")
-        self.sampler_value = QLabel("—")
-        self.cfg_value = QLabel("—")
-        self.seed_value = QLabel("—")
-        #self.prompt_value = QLabel("—")
+        # --- Primary node display (tier 1 + tier 2) ---
+        mono_style = "font-family: 'Courier New', 'Consolas', monospace; font-size: 9pt;"
+        self.primary_display = QTextEdit()
+        self.primary_display.setReadOnly(True)
+        self.primary_display.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.primary_display.setStyleSheet(mono_style)
+        metadata_vbox.addWidget(self.primary_display, stretch=1)
 
-        self.prompt_value = QTextEdit("—")
-        self.prompt_value.setReadOnly(True)
-        self.prompt_value.setFixedHeight(60)  # about 3 lines tall
-        self.prompt_value.setMaximumHeight(120)  # clamp max expansion
-        self.prompt_value.setLineWrapMode(QTextEdit.WidgetWidth)
+        # --- Tier 3 toggle + display ---
+        self.tier3_btn = QPushButton("▶ plumbing")
+        self.tier3_btn.setStyleSheet("text-align: left; padding: 2px 6px; font-size: 10px;")
+        self.tier3_btn.setVisible(False)
+        self.tier3_btn.clicked.connect(self.toggle_tier3)
+        metadata_vbox.addWidget(self.tier3_btn)
 
-        # --- Negative Prompt field ---
-        self.neg_prompt_label = style_label(QLabel("Neg. Prompt:"))
-        self.neg_prompt_value = QTextEdit("—")
-        self.neg_prompt_value.setReadOnly(True)
-        self.neg_prompt_value.setFixedHeight(60)          # about 3 lines tall
-        self.neg_prompt_value.setMaximumHeight(120)       # clamp max expansion
-        self.neg_prompt_value.setLineWrapMode(QTextEdit.WidgetWidth)
-        self.neg_prompt_value.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.tier3_display = QTextEdit()
+        self.tier3_display.setReadOnly(True)
+        self.tier3_display.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.tier3_display.setStyleSheet(mono_style)
+        self.tier3_display.setMaximumHeight(160)
+        self.tier3_display.setVisible(False)
+        metadata_vbox.addWidget(self.tier3_display)
 
+        self.primary_display.installEventFilter(self)
+        self.tier3_display.installEventFilter(self)
 
-        row_offset = 5
-        metadata_layout.addWidget(self.model_label, row_offset + 0, 0)
-        metadata_layout.addWidget(self.model_value, row_offset + 0, 1)
-        metadata_layout.addWidget(self.steps_label, row_offset + 1, 0)
-        metadata_layout.addWidget(self.steps_value, row_offset + 1, 1)
-        metadata_layout.addWidget(self.sampler_label, row_offset + 2, 0)
-        metadata_layout.addWidget(self.sampler_value, row_offset + 2, 1)
-        metadata_layout.addWidget(self.cfg_label, row_offset + 3, 0)
-        metadata_layout.addWidget(self.cfg_value, row_offset + 3, 1)
-        metadata_layout.addWidget(self.seed_label, row_offset + 4, 0)
-        metadata_layout.addWidget(self.seed_value, row_offset + 4, 1)
-        #metadata_layout.addWidget(self.prompt_label, row_offset + 5, 0)
-        #metadata_layout.addWidget(self.prompt_value, row_offset + 5, 1)
-        metadata_layout.addWidget(self.prompt_label, row_offset + 5, 0, Qt.AlignTop)
-        metadata_layout.addWidget(self.prompt_value, row_offset + 5, 1)
-
-        metadata_layout.addWidget(self.neg_prompt_label, row_offset + 6, 0, Qt.AlignTop)
-        metadata_layout.addWidget(self.neg_prompt_value, row_offset + 6, 1)
-
-
-            # --- Copy Metadata Button ---
+        # --- Copy button ---
         copy_btn = QPushButton("Copy Metadata")
-        metadata_layout.setRowStretch(row_offset + 7, 1)  # spacer row
-        metadata_layout.addWidget(copy_btn, row_offset + 8, 0, 1, 2)
-        
-        
-        
+        metadata_vbox.addWidget(copy_btn)
+
         # Add panel to main layout
         self.main_layout.addWidget(self.right_metadata, 0, 2)
 
-        # Keep content top-aligned
-        metadata_layout.setRowStretch(row_offset + 8, 1)
 
 
+        # ---- View Menu ----
+        view_menu = self.menuBar().addMenu("View")
+        self._lock_zoom_action = QAction("Lock Zoom", self, checkable=True, shortcut="Z")
+        self._lock_zoom_action.toggled.connect(lambda checked: setattr(self.image_view, "zoom_locked", checked))
+        view_menu.addAction(self._lock_zoom_action)
 
         # ---- Connect Signals ----
         open_btn.clicked.connect(self.open_image_file)
@@ -247,23 +235,18 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.installEventFilter(self)
 
         def copy_metadata_to_clipboard():
-            """Copy all current metadata text to clipboard."""
             lines = [
                 f"File: {self.file_name_value.text()}",
                 f"Dimensions: {self.file_dim_value.text()}",
                 f"Size: {self.file_size_value.text()}",
                 f"Modified: {self.file_mod_value.text()}",
-                f"Model: {self.model_value.text()}",
-                f"Steps: {self.steps_value.text()}",
-                f"Sampler: {self.sampler_value.text()}",
-                f"CFG: {self.cfg_value.text()}",
-                f"Seed: {self.seed_value.text()}",
-                f"Prompt: {self.prompt_value.toPlainText()}",
-                f"Neg. Prompt: {self.neg_prompt_value.toPlainText()}",
+                "",
+                self.primary_display.toPlainText(),
             ]
-            text = "\n".join(lines)
-            QApplication.clipboard().setText(text)
-            print("📋 Metadata copied to clipboard")
+            t3 = self.tier3_display.toPlainText()
+            if t3:
+                lines += ["", "--- plumbing ---", t3]
+            QApplication.clipboard().setText("\n".join(lines))
 
 
         copy_btn.clicked.connect(copy_metadata_to_clipboard)
@@ -271,24 +254,32 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
             
     def eventFilter(self, obj, event):
+        if event.type() == QEvent.Wheel:
+            if obj in (self.primary_display, self.tier3_display):
+                obj.verticalScrollBar().setValue(
+                    obj.verticalScrollBar().value() - event.angleDelta().y() // 4
+                )
+                return True
         if event.type() == QEvent.KeyPress:
             if event.key() in (Qt.Key_Right, Qt.Key_Left):
-                result = self.keyPressEvent(event)
-                return True  # Event handled, stop propagation
+                self.keyPressEvent(event)
+                return True
         return super().eventFilter(obj, event)
 
     def get_workflow_data(self, file_path):
-        """Get workflow data using cache"""
-        return self.workflow_cache.get(file_path, digest_workflow)
-    
+        return self.workflow_cache.get(file_path, get_png_metadata)
+
     def preload_workflows(self, file_paths):
-        """Preload workflows for nearby images"""
-        self.workflow_cache.preload_batch(file_paths, digest_workflow)
+        self.workflow_cache.preload_batch(file_paths, get_png_metadata)
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MetaViewApp()
     window.show()
+    if len(sys.argv) > 1:
+        import os
+        if os.path.isfile(sys.argv[1]):
+            QTimer.singleShot(0, lambda: window.load_image_from_path(sys.argv[1]))
     sys.exit(app.exec())
 
