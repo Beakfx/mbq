@@ -2,43 +2,56 @@
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QScrollArea, QTextEdit,
+    QScrollArea, QTextEdit, QMessageBox, QFileDialog,
 )
-from PySide6.QtGui import QAction
-from mbq_functions import ImageCanvas
-from PySide6.QtCore import Qt, QTimer, QEvent
+from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtCore import Qt, QTimer, QEvent, QUrl
+from mbq_functions import ImageCanvas, WorkflowCache
 from mbq_parser import get_png_metadata
-from mbq_functions import WorkflowCache
 from mbq_logic import MetaViewLogicMixin
-
 
 import sys
 
 
+class StatusBulb(QLabel):
+    _COLORS = {"on": "#44cc44", "warn": "#c8823a", "off": "#2a2a2a"}
+
+    def __init__(self, tooltip_name, parent=None):
+        super().__init__(parent)
+        self._name = tooltip_name
+        self.setFixedSize(14, 14)
+        self._state = "off"
+        self._apply()
+
+    def set_state(self, state: str):
+        if state != self._state:
+            self._state = state
+            self._apply()
+
+    def _apply(self):
+        c = self._COLORS[self._state]
+        self.setStyleSheet(f"background:{c}; border-radius:7px; border:1px solid #555;")
+        self.setToolTip(f"{self._name}: {'ON' if self._state != 'off' else 'OFF'}")
 
 
 class MetaViewApp(MetaViewLogicMixin, QMainWindow):
-    # Now inherits from both QMainWindow and our logic mixin
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Image Viewer GL Layout")
+        self.setWindowTitle("MBQ — Meta Browser")
         self.workflow_cache = WorkflowCache(max_size=50)
 
-        # --- 4:3 Optimized Window Size ---
-        # Calculate for 1024x768 image + UI elements
-        self.resize(1400, 900)  # Wider window to accommodate right sidebar
-        
+        self.resize(1400, 900)
+
         self.folder_model = None
         self.image_cache = {}
         self.thumb_cache = {}
         self.cache_size = 5
 
-        # --- Design reference sizes for 4:3 ---
-        self.design_canvas_w = 1024  # Target image width
-        self.design_canvas_h = 768   # Target image height
-        self.design_thumb_w = 120    # Thumbnail width
-        self.design_thumb_h = 90     # Thumbnail height (4:3)
-        
+        self.design_canvas_w = 1024
+        self.design_canvas_h = 768
+        self.design_thumb_w = 120
+        self.design_thumb_h = 90
+
         self.scale_factor = 1.0
 
         # ---- Central Widget ----
@@ -50,59 +63,56 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.main_layout.setContentsMargins(10, 20, 10, 20)
         self.main_layout.setSpacing(10)
 
-        # Column weights - center area for image, right for metadata
-        self.main_layout.setColumnStretch(0, 0)   # left aesthetic spacer (fixed)
-        self.main_layout.setColumnStretch(1, 3)   # center image area (main content)
-        self.main_layout.setColumnStretch(2, 1)   # right metadata panel (~1/4 width)
-        self.main_layout.setRowStretch(0, 1)      # main row expands
+        self.main_layout.setColumnStretch(0, 0)
+        self.main_layout.setColumnStretch(1, 3)
+        self.main_layout.setColumnStretch(2, 1)
+        self.main_layout.setRowStretch(0, 1)
 
-        # --- Left Spacer (Aesthetic) ---
+        # --- Left Spacer ---
         self.left_spacer = QFrame()
-        self.left_spacer.setFixedWidth(40)  # Small fixed width spacer
+        self.left_spacer.setFixedWidth(40)
         self.left_spacer.setStyleSheet("background: transparent;")
         self.main_layout.addWidget(self.left_spacer, 0, 0)
 
         # --- Center Image Area ---
         self.center_group = QGroupBox("Image View")
         self.center_group.setStyleSheet("""
-            QGroupBox { 
-                border: 2px solid #333333; 
-                border-radius: 4px; 
-                margin-top: 10px; 
-            } 
-            QGroupBox::title { 
-                subcontrol-origin: margin; 
-                subcontrol-position: top left; 
-                left: 10px; 
-                padding: 0 5px 0 5px; 
-                background: palette(window); 
+            QGroupBox {
+                border: 2px solid #333333;
+                border-radius: 4px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                background: palette(window);
             }
         """)
-      
+
         self.main_layout.addWidget(self.center_group, 0, 1)
         center_layout = QGridLayout(self.center_group)
-        center_layout.setRowStretch(0, 5)  # image view (most space)
-        center_layout.setRowStretch(1, 1)  # filmstrip
-        center_layout.setRowStretch(2, 0)  # buttons
+        center_layout.setRowStretch(0, 5)
+        center_layout.setRowStretch(1, 1)
+        center_layout.setRowStretch(2, 0)
         center_layout.setColumnStretch(0, 1)
 
         # ---- Image Canvas ----
         self.image_view = ImageCanvas()
         self.image_view.fileDropped.connect(self.load_image_from_path)
-        self.image_view.setMinimumSize(800, 600)  # 4:3 minimum
+        self.image_view.setMinimumSize(800, 600)
         center_layout.addWidget(self.image_view, 0, 0)
 
         # ---- Filmstrip Frame ----
         self.filmstrip_frame = QFrame()
         filmstrip_layout = QVBoxLayout(self.filmstrip_frame)
 
-        # Top separator
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         sep.setStyleSheet("color: #252222;")
         filmstrip_layout.addWidget(sep)
 
-        # Thumbnail scroller
         self.thumb_scroll_area = QScrollArea()
         self.thumb_scroll_area.setWidgetResizable(True)
         self.thumb_scroll_area.setMinimumHeight(100)
@@ -110,12 +120,13 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.thumb_layout = QHBoxLayout(self.thumb_container)
         self.thumb_scroll_area.setWidget(self.thumb_container)
         filmstrip_layout.addWidget(self.thumb_scroll_area)
-        
+
         center_layout.addWidget(self.filmstrip_frame, 1, 0)
 
         # ---- Button Frame ----
         self.button_frame = QFrame()
         btn_layout = QHBoxLayout(self.button_frame)
+        btn_layout.setContentsMargins(0, 2, 0, 2)
 
         next_btn = QPushButton("Next Image")
         prev_btn = QPushButton("Previous Image")
@@ -125,11 +136,39 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         btn_layout.addWidget(prev_btn)
         btn_layout.addWidget(open_btn)
 
+        # ---- Status Bulbs ----
+        btn_layout.addStretch()
+
+        bulb_style = "color: #888; font-size: 10px;"
+
+        self.bulb_zoom = StatusBulb("Zoom Lock")
+        zoom_lbl = QLabel("Zoom")
+        zoom_lbl.setStyleSheet(bulb_style)
+        zoom_group = QHBoxLayout()
+        zoom_group.setSpacing(4)
+        zoom_group.addWidget(self.bulb_zoom)
+        zoom_group.addWidget(zoom_lbl)
+        btn_layout.addLayout(zoom_group)
+
+        self.bulb_wedge = StatusBulb("Wedge node")
+        wedge_lbl = QLabel("Wedge")
+        wedge_lbl.setStyleSheet(bulb_style)
+        wedge_group = QHBoxLayout()
+        wedge_group.setSpacing(4)
+        wedge_group.addWidget(self.bulb_wedge)
+        wedge_group.addWidget(wedge_lbl)
+        btn_layout.addLayout(wedge_group)
+
+        self.bulb_uncomfy = StatusBulb("UnComfy")
+        uncomfy_lbl = QLabel("UnComfy")
+        uncomfy_lbl.setStyleSheet(bulb_style)
+        uncomfy_group = QHBoxLayout()
+        uncomfy_group.setSpacing(4)
+        uncomfy_group.addWidget(self.bulb_uncomfy)
+        uncomfy_group.addWidget(uncomfy_lbl)
+        btn_layout.addLayout(uncomfy_group)
+
         center_layout.addWidget(self.button_frame, 2, 0)
-
-
-
-
 
         # --- Right Metadata Panel ---
         self.right_metadata = QGroupBox("Metadata")
@@ -146,7 +185,6 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
             lbl.setStyleSheet(label_style)
             return lbl
 
-        # --- File Info (compact grid) ---
         self.file_name_label = style_label(QLabel("File:"))
         self.file_dim_label  = style_label(QLabel("Dimensions:"))
         self.file_size_label = style_label(QLabel("Size:"))
@@ -181,7 +219,6 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         sep.setStyleSheet("color: #333;")
         metadata_vbox.addWidget(sep)
 
-        # --- Primary node display (tier 1 + tier 2) ---
         mono_style = "font-family: 'Courier New', 'Consolas', monospace; font-size: 9pt;"
         self.primary_display = QTextEdit()
         self.primary_display.setReadOnly(True)
@@ -189,7 +226,6 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.primary_display.setStyleSheet(mono_style)
         metadata_vbox.addWidget(self.primary_display, stretch=1)
 
-        # --- Tier 3 toggle + display ---
         self.tier3_btn = QPushButton("▶ plumbing")
         self.tier3_btn.setStyleSheet("text-align: left; padding: 2px 6px; font-size: 10px;")
         self.tier3_btn.setVisible(False)
@@ -207,52 +243,95 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.primary_display.installEventFilter(self)
         self.tier3_display.installEventFilter(self)
 
-        # --- Copy button ---
         copy_btn = QPushButton("Copy Metadata")
         metadata_vbox.addWidget(copy_btn)
 
-        # Add panel to main layout
         self.main_layout.addWidget(self.right_metadata, 0, 2)
 
+        # ---- Menu Bar ----
+        menu_bar = self.menuBar()
 
+        # File
+        file_menu = menu_bar.addMenu("File")
+        file_menu.addAction("Open Image", self.open_image_file)
+        file_menu.addAction("Open Path", self.open_folder)
+        file_menu.addSeparator()
+        file_menu.addAction("Exit", QApplication.instance().quit)
 
-        # ---- View Menu ----
-        view_menu = self.menuBar().addMenu("View")
+        # Edit
+        edit_menu = menu_bar.addMenu("Edit")
+        edit_menu.addAction("Copy Image", self._copy_image)
+        edit_menu.addAction("Copy Workflow", self._copy_workflow)
+
+        # View
+        view_menu = menu_bar.addMenu("View")
         self._lock_zoom_action = QAction("Lock Zoom", self, checkable=True, shortcut="Z")
-        self._lock_zoom_action.toggled.connect(lambda checked: setattr(self.image_view, "zoom_locked", checked))
+        self._lock_zoom_action.toggled.connect(self._on_zoom_lock_toggled)
         view_menu.addAction(self._lock_zoom_action)
+        view_menu.addAction("Reset Zoom", self.image_view.reset_zoom)
+        view_menu.addSeparator()
+        self._freeze_scroll_action = QAction("Freeze Scroll", self, checkable=True, shortcut="S")
+        view_menu.addAction(self._freeze_scroll_action)
+
+        # About
+        about_menu = menu_bar.addMenu("About")
+        about_menu.addAction("About MBQ…", self._show_about)
+        about_menu.addAction("Help", self._open_help)
 
         # ---- Connect Signals ----
         open_btn.clicked.connect(self.open_image_file)
         next_btn.clicked.connect(self.show_next_image)
         prev_btn.clicked.connect(self.show_prev_image)
+        copy_btn.clicked.connect(self._copy_workflow)
 
-        # Initialize after UI is built
         QTimer.singleShot(100, self.initialize_scale)
-
-
-        # Install event filter on THIS window only
         self.installEventFilter(self)
 
-        def copy_metadata_to_clipboard():
-            lines = [
-                f"File: {self.file_name_value.text()}",
-                f"Dimensions: {self.file_dim_value.text()}",
-                f"Size: {self.file_size_value.text()}",
-                f"Modified: {self.file_mod_value.text()}",
-                "",
-                self.primary_display.toPlainText(),
-            ]
-            t3 = self.tier3_display.toPlainText()
-            if t3:
-                lines += ["", "--- plumbing ---", t3]
-            QApplication.clipboard().setText("\n".join(lines))
+    # ---- Menu handlers ----
 
+    def open_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Open Folder")
+        if folder:
+            self.load_folder_from_path(folder)
 
-        copy_btn.clicked.connect(copy_metadata_to_clipboard)
+    def _on_zoom_lock_toggled(self, checked: bool):
+        self.image_view.zoom_locked = checked
+        self.bulb_zoom.set_state("on" if checked else "off")
 
+    def _copy_image(self):
+        if self.image_view.image_item:
+            QApplication.clipboard().setPixmap(self.image_view.image_item.pixmap())
 
-            
+    def _copy_workflow(self):
+        lines = [
+            f"File: {self.file_name_value.text()}",
+            f"Dimensions: {self.file_dim_value.text()}",
+            f"Size: {self.file_size_value.text()}",
+            f"Modified: {self.file_mod_value.text()}",
+            "",
+            self.primary_display.toPlainText(),
+        ]
+        t3 = self.tier3_display.toPlainText()
+        if t3:
+            lines += ["", "--- plumbing ---", t3]
+        QApplication.clipboard().setText("\n".join(lines))
+
+    def _show_about(self):
+        QMessageBox.about(
+            self,
+            "About MBQ",
+            "MBQ — Meta Browser Qt\n"
+            "PySide6 image viewer for ComfyUI PNGs.\n\n"
+            "Reads ComfyUI prompt metadata from PNG text chunks\n"
+            "and displays generation parameters in a side panel.",
+        )
+
+    def _open_help(self):
+        # TODO: replace with actual repo URL
+        QDesktopServices.openUrl(QUrl("https://github.com/YOUR_REPO"))
+
+    # ---- Event filter ----
+
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Wheel:
             if obj in (self.primary_display, self.tier3_display):
@@ -265,6 +344,8 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
                 self.keyPressEvent(event)
                 return True
         return super().eventFilter(obj, event)
+
+    # ---- Cache helpers ----
 
     def get_workflow_data(self, file_path):
         return self.workflow_cache.get(file_path, get_png_metadata)
@@ -281,5 +362,6 @@ if __name__ == "__main__":
         import os
         if os.path.isfile(sys.argv[1]):
             QTimer.singleShot(0, lambda: window.load_image_from_path(sys.argv[1]))
+        elif os.path.isdir(sys.argv[1]):
+            QTimer.singleShot(0, lambda: window.load_folder_from_path(sys.argv[1]))
     sys.exit(app.exec())
-

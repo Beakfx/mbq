@@ -22,25 +22,21 @@ too complex and was the root cause of prior pain — ignore it entirely.
 
 | File | Role |
 |------|------|
-| `mbq_layout.py` | Main `MetaViewApp` window — PySide6 QMainWindow, UI layout |
+| `mbq_browser.py` | Main `MetaViewApp` window — PySide6 QMainWindow, UI layout, menus |
 | `mbq_logic.py` | `MetaViewLogicMixin` — image navigation, metadata display, file dialog |
 | `mbq_functions.py` | `ImageFolder`, `ImageCanvas` (QGraphicsView), `WorkflowCache` |
-| `mbq_parser.py` | `digest_workflow()` — PNG chunk extraction + ComfyUI prompt graph traversal |
-| `mbq_metadata.py` | `ImageMetadata` dataclass — unified structure for all extracted fields |
-| `mbq_nodes.py` | Static ComfyUI node registry (Jan 2025 snapshot) — used by CLI tools only |
+| `mbq_parser.py` | `get_png_metadata()` — PNG chunk extraction + ComfyUI prompt graph traversal |
+| `mbq_nodes.py` | Static ComfyUI node registry (Jan 2025 snapshot) — reference only |
 | `dump_png_text_chunks.py` | CLI: dump raw PNG text chunks for debugging |
-| `mbq_audit_current_logic.py` | CLI: audit parser decisions on a batch of PNGs |
-| `mbq_dump_testset.py` | CLI: generate metadata reports from a test image set |
 
 ## Architecture
 
 ```
-MetaViewApp (mbq_layout.py)
+MetaViewApp (mbq_browser.py)
   ├─ MetaViewLogicMixin (mbq_logic.py)
-  │     └─ digest_workflow() ← mbq_parser.py
-  │           └─ ImageMetadata ← mbq_metadata.py
+  │     └─ get_png_metadata() ← mbq_parser.py
   ├─ ImageCanvas, ImageFolder, WorkflowCache (mbq_functions.py)
-  └─ [mbq_nodes.py — CLI audit tools only, not used by the GUI]
+  └─ [mbq_nodes.py — reference only, not used by the GUI]
 ```
 
 ## PNG chunk format
@@ -74,13 +70,17 @@ prompt graph (KSampler, CheckpointLoaderSimple, CLIPTextEncode, etc.).
 
 ```
 # Run the GUI
-python mbq_layout.py
+python mbq_browser.py
+
+# Open directly to an image or folder
+python mbq_browser.py path/to/image.png
+python mbq_browser.py path/to/folder
 
 # Inspect raw chunks in a PNG before debugging the parser
 python dump_png_text_chunks.py <file.png>
 
-# Batch-audit parser decisions against a folder of test images
-python mbq_audit_current_logic.py <image_dir>
+# Pretty-print parsed metadata (what the GUI sees)
+python mbq_parser.py <file.png>
 ```
 
 No formal test runner exists. Test images are stored under `project_docs/`.

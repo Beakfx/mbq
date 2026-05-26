@@ -2,7 +2,21 @@
   "permissions": {
     "allow": [
       "Bash(Get-ChildItem -Path \"d:\\\\My Actual Documents\\\\Projects\\\\Code\\\\PyProjects\\\\mb_gui\" -Recurse -File)",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(python mbq_parser.py \"images/straight_gen_monkeys.png\")",
+      "Bash(python mbq_parser.py \"images/disc_fix_00006_.png\")",
+      "Bash(python mbq_parser.py \"images/controlnet_i2i_tableLady_00004_.png\")",
+      "Bash(del screenshot.png screenshot_loaded.png screenshot_with_image.png)",
+      "Bash(find \"d:/My Actual Documents/Projects/Code/PyProjects/mb_gui\" -name \"ComfyUI_00101_betterHand.png\" 2>/dev/null; find \"d:/My Actual Documents\" -name \"ComfyUI_00101_betterHand.png\" 2>/dev/null | head -5)",
+      "Read(//d/My Actual Documents/**)",
+      "Bash(find / -name \"ComfyUI_00101_betterHand.png\" 2>/dev/null | head -5)",
+      "Read(//d//**)",
+      "Bash(python mbq_parser.py \"images/redux_1_00002_.png\")",
+      "Bash(python dump_png_text_chunks.py \"images/redux_1_00002_.png\")",
+      "Bash(python -c ' *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\My Actual Documents\\\\Projects\\\\Code\\\\PyProjects\\\\mb_gui\" -Filter \"*.py\")",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Sort-Object)"
     ]
   }
 }
