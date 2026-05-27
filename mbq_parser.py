@@ -188,16 +188,47 @@ def _saveimage_prefixes(prompt_json: dict) -> list:
     return prefixes
 
 
+def get_wedge_data(prompt_json: dict) -> Optional[dict]:
+    """Return wedge info if an MBQWedge node is present, else None."""
+    wedge_params = None
+    all_params: dict = {}
+
+    for node in prompt_json.values():
+        if not isinstance(node, dict):
+            continue
+        ctype = str(node.get("class_type") or "")
+        inputs = _scalar_inputs(node.get("inputs") or {})
+        if ctype == "MBQWedge":
+            wedge_params = inputs
+        else:
+            all_params.update(inputs)
+
+    if wedge_params is None:
+        return None
+
+    param_name    = wedge_params.get("parameter_name", "")
+    current_value = all_params.get(param_name)
+
+    return {
+        "parameter_name": param_name,
+        "current_value":  current_value,
+        "start":          wedge_params.get("start"),
+        "step_size":      wedge_params.get("step_size"),
+        "stop":           wedge_params.get("stop"),
+    }
+
+
 def get_png_metadata(file_path: str | Path) -> dict:
-    """Return {"tiers": (t1, t2, t3), "saveimage_prefixes": [...]} or {} if no prompt chunk."""
+    """Return {"tiers": ..., "saveimage_prefixes": [...], "wedge": ...} or {} if no prompt chunk."""
     path = Path(file_path)
     if (cached := _cache_get(path)) is not None:
         return cached
     prompt_json = read_prompt_chunk(path)
     if prompt_json is not None:
         result = {
-            "tiers": tier_prompt_nodes(prompt_json),
+            "tiers":              tier_prompt_nodes(prompt_json),
             "saveimage_prefixes": _saveimage_prefixes(prompt_json),
+            "wedge":              get_wedge_data(prompt_json),
         }
     else:
         result = {}

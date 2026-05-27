@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QTextEdit, QMessageBox, QFileDialog,
+    QTextEdit, QMessageBox, QFileDialog, QActionGroup,
 )
 from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtCore import Qt, QTimer, QEvent, QUrl
@@ -53,6 +53,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.design_thumb_h = 90
 
         self.scale_factor = 1.0
+        self._wedge_corner = "bottom_left"
 
         # ---- Central Widget ----
         central = QWidget()
@@ -274,6 +275,20 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
             lambda checked: self.bulb_scroll.set_state("on" if checked else "off")
         )
         view_menu.addAction(self._freeze_scroll_action)
+        view_menu.addSeparator()
+        overlay_menu = view_menu.addMenu("Wedge Overlay")
+        overlay_group = QActionGroup(self)
+        for _label, _key in [
+            ("Bottom Left",  "bottom_left"),
+            ("Bottom Right", "bottom_right"),
+            ("Top Left",     "top_left"),
+            ("Top Right",    "top_right"),
+        ]:
+            act = QAction(_label, self, checkable=True)
+            act.setChecked(_key == "bottom_left")
+            act.triggered.connect(lambda checked, k=_key: setattr(self, "_wedge_corner", k))
+            overlay_group.addAction(act)
+            overlay_menu.addAction(act)
 
         # About
         about_menu = menu_bar.addMenu("About")
@@ -333,8 +348,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         )
 
     def _open_help(self):
-        # TODO: replace with actual repo URL
-        QDesktopServices.openUrl(QUrl("https://github.com/YOUR_REPO"))
+        QDesktopServices.openUrl(QUrl("https://github.com/Beakfx/mbq"))
 
     # ---- Event filter ----
 

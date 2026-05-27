@@ -144,11 +144,8 @@ class MetaViewLogicMixin:
 
             # Bulbs
             self.bulb_uncomfy.set_state("warn" if is_preview else "off")
-            has_wedge = any(
-                "wedge" in n["class_type"].lower() or "wedge" in n["title"].lower()
-                for n in t1 + t2 + t3
-            )
-            self.bulb_wedge.set_state("on" if has_wedge else "off")
+            wedge = md.get("wedge")
+            self.bulb_wedge.set_state("on" if wedge else "off")
         else:
             self.primary_display.setPlainText("(no ComfyUI metadata)")
             self.tier3_display.setPlainText("")
@@ -158,6 +155,14 @@ class MetaViewLogicMixin:
             # Bulbs
             self.bulb_uncomfy.set_state("warn")
             self.bulb_wedge.set_state("off")
+            wedge = None
+
+        # Canvas overlay
+        if wedge and wedge.get("current_value") is not None:
+            overlay_text = f"{wedge['parameter_name']}: {wedge['current_value']}"
+        else:
+            overlay_text = None
+        self.image_view.set_wedge_overlay(overlay_text, getattr(self, "_wedge_corner", "bottom_left"))
 
     def toggle_tier3(self):
         visible = not self.tier3_display.isVisible()

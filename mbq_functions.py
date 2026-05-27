@@ -1,8 +1,11 @@
 #mbq_functions.py 
 #combines ImageFolder, ImageCanvas, WorkflowCache classes to single file.
 
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
-from PySide6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QPainter, QImageReader
+from PySide6.QtWidgets import (
+    QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
+    QGraphicsTextItem, QGraphicsRectItem,
+)
+from PySide6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QPainter, QImageReader, QColor, QFont
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 import os
@@ -121,6 +124,7 @@ class ImageCanvas(QGraphicsView):
         self._middle_press_pos = None
         self._zoom_anchor_vp = None
         self._zoom_anchor_scene = None
+        self._overlay_items: list = []
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Right, Qt.Key_Left):
@@ -219,6 +223,7 @@ class ImageCanvas(QGraphicsView):
             saved_transform = self.transform()
             saved_center = self.mapToScene(self.viewport().rect().center())
 
+        self._overlay_items = []   # drop refs before scene.clear() deletes C++ objects
         self.scene.clear()
         self.image_item = QGraphicsPixmapItem(pixmap)
         self.image_item.setTransformationMode(Qt.SmoothTransformation)
@@ -247,6 +252,41 @@ class ImageCanvas(QGraphicsView):
         if self.image_item:
             self.resetTransform()
             self.centerOn(self.image_item.boundingRect().center())
+
+    def set_wedge_overlay(self, text: str | None, corner: str = "bottom_left"):
+        for item in self._overlay_items:
+            if item.scene():
+                self.scene.removeItem(item)
+        self._overlay_items = []
+        if not text or not self.image_item:
+            return
+
+        font = QFont("Courier New", 18, QFont.Bold)
+        text_item = QGraphicsTextItem(text)
+        text_item.setFont(font)
+        text_item.setDefaultTextColor(QColor(255, 255, 255))
+        tw = text_item.boundingRect().width()
+        th = text_item.boundingRect().height()
+        pad, margin = 8, 12
+
+        bg = QGraphicsRectItem(0, 0, tw + pad * 2, th + pad)
+        bg.setBrush(QColor(0, 0, 0, 160))
+        bg.setPen(Qt.NoPen)
+
+        r = self.image_item.boundingRect()
+        positions = {
+            "bottom_left":  (r.left()  + margin,              r.bottom() - th - pad - margin),
+            "bottom_right": (r.right() - tw - pad*2 - margin, r.bottom() - th - pad - margin),
+            "top_left":     (r.left()  + margin,              r.top() + margin),
+            "top_right":    (r.right() - tw - pad*2 - margin, r.top() + margin),
+        }
+        x, y = positions.get(corner, positions["bottom_left"])
+        bg.setPos(x, y)
+        text_item.setPos(x + pad, y + pad / 2)
+
+        self.scene.addItem(bg)
+        self.scene.addItem(text_item)
+        self._overlay_items = [bg, text_item]
 
 
 
