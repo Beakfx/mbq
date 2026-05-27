@@ -6,17 +6,18 @@ class MBQWedge:
     Parameter sweep (photography-style wedge/bracket).
     Wire INT output → steps/seed offset/etc; FLOAT output → cfg/denoise/guidance/etc.
     ComfyUI greys out incompatible socket types automatically when dragging a link.
+    Number of runs = floor((stop - start) / step_size) + 1, shown live on the node.
     """
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "parameter_name": ("STRING", {"default": "steps", "multiline": False}),
+                "parameter_name": ("STRING", {"default": "connect output →", "multiline": False}),
                 "start":     ("FLOAT", {"default": 1.0,  "min": -99999.0, "max": 99999.0, "step": 0.1}),
                 "step_size": ("FLOAT", {"default": 1.0,  "min": 0.001,    "max": 99999.0, "step": 0.1}),
                 "stop":      ("FLOAT", {"default": 10.0, "min": -99999.0, "max": 99999.0, "step": 0.1}),
-                "decimals":  ("INT",   {"default": 0,    "min": 0,        "max": 6}),
+                # "decimals": ("INT", {"default": 2, "min": 0, "max": 6}),  # reserved for future use
             }
         }
 
@@ -26,8 +27,9 @@ class MBQWedge:
     FUNCTION       = "sweep"
     CATEGORY       = "MBQ"
 
-    def sweep(self, parameter_name, start, step_size, stop, decimals):
+    def sweep(self, parameter_name, start, step_size, stop):
         getcontext().prec = 12
+        decimals = 2  # reserved: restore from INPUT_TYPES when needed
         values = []
         v      = Decimal(str(start))
         d_step = Decimal(str(step_size))

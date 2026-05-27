@@ -33,7 +33,6 @@ connect the right type for the target parameter.
 | `start` | FLOAT | First value in the sweep |
 | `step_size` | FLOAT | Increment between values |
 | `stop` | FLOAT | Last value (inclusive) |
-| `decimals` | INT | Decimal places to round to. Use `0` for integer sweeps, `1`–`2` for float sweeps. |
 
 ### Example: sweep steps 10 → 20 by 2
 
@@ -42,7 +41,6 @@ parameter_name = "steps"
 start     = 10
 step_size = 2
 stop      = 20
-decimals  = 0
 ```
 
 Wire `int_value` → KSampler `steps`. Queue once → 6 images generated, one per value.
@@ -54,10 +52,15 @@ parameter_name = "cfg"
 start     = 1.0
 step_size = 1.5
 stop      = 7.0
-decimals  = 1
 ```
 
 Wire `float_value` → KSampler `cfg`. Queue once → 5 images generated.
+
+### Important: let all iterations finish
+
+ComfyUI runs all samplers first, then all decoders, then all save/preview nodes —
+it does not produce output after each individual iteration. **Do not interrupt the
+queue mid-run.** All images appear at the end once the full sweep completes.
 
 ## MBQ Viewer integration
 
