@@ -117,8 +117,29 @@ class MetaViewLogicMixin:
         tier3_was_open = self.tier3_display.isVisible()
         self.tier3_display.setVisible(False)
 
+        wedge = md.get("wedge") if md else None
+        wedge_val = None
+        if wedge:
+            wedge_val = wedge.get("current_value")
+            if wedge_val is None:
+                wedge_val = self._infer_wedge_value(file_info["path"], wedge)
+
         if md and "tiers" in md:
             t1, t2, t3 = md["tiers"]
+
+            # Inject inferred current value into the MBQWedge node block
+            if wedge and wedge_val is not None:
+                for node in t1 + t2:
+                    if node.get("class_type", "").startswith("MBQWedge"):
+                        p = node["params"]
+                        new_p = {}
+                        if "parameter_name" in p:
+                            new_p["parameter_name"] = p["parameter_name"]
+                        new_p["current"] = f"{wedge_val:.2f}"
+                        new_p.update({k: v for k, v in p.items() if k != "parameter_name"})
+                        node["params"] = new_p
+                        break
+
             primary_html = _build_display_text(t1 + t2)
             if primary_html:
                 if saved_scroll is not None:
@@ -142,26 +163,18 @@ class MetaViewLogicMixin:
             self.tier3_btn.setText(f'<span style="font-size:18px;">{arrow}</span> plumbing ({self._tier3_count} nodes)')
             self.tier3_btn.setVisible(self._tier3_count > 0)
 
-            # Bulbs
             self.bulb_uncomfy.set_state("warn" if is_preview else "off")
-            wedge = md.get("wedge")
             self.bulb_wedge.set_state("on" if wedge else "off")
         else:
             self.primary_display.setPlainText("(no ComfyUI metadata)")
             self.tier3_display.setPlainText("")
             self._tier3_count = 0
             self.tier3_btn.setVisible(False)
-
-            # Bulbs
             self.bulb_uncomfy.set_state("warn")
             self.bulb_wedge.set_state("off")
-            wedge = None
 
         # Canvas overlay
-        if wedge and wedge.get("current_value") is not None:
-            overlay_text = f"{wedge['parameter_name']}: {wedge['current_value']}"
-        else:
-            overlay_text = None
+        overlay_text = f"{wedge['parameter_name']}: {wedge_val:.2f}" if wedge and wedge_val is not None else None
         self.image_view.set_wedge_overlay(overlay_text, getattr(self, "_wedge_corner", "bottom_left"))
 
     def toggle_tier3(self):
@@ -247,6 +260,36 @@ class MetaViewLogicMixin:
                 self.populate_filmstrip()
                 self.preload_adjacent_images()
 
+    def _infer_wedge_value(self, current_path, wedge):
+        """Infer per-image sweep value by position among folder images with matching wedge config."""
+        if not self.folder_model:
+            return None
+        start = wedge.get("start")
+        step  = wedge.get("increment")
+        if start is None or not step:
+            return None
+
+        files = self.folder_model.files
+        curr_idx = self.folder_model.index
+        window = files[max(0, curr_idx - 100): curr_idx + 101]
+
+        matching = []
+        for f in window:
+            md = self.get_workflow_data(f["path"])
+            if not md:
+                continue
+            w = md.get("wedge")
+            if (w and
+                    w.get("parameter_name") == wedge.get("parameter_name") and
+                    w.get("start") == start and
+                    w.get("increment") == step and
+                    w.get("stop") == wedge.get("stop")):
+                matching.append(f["path"])
+
+        if current_path not in matching:
+            return None
+        return start + matching.index(current_path) * step
+
     def populate_filmstrip(self):
         for i in reversed(range(self.thumb_layout.count())):
             item = self.thumb_layout.takeAt(i)
@@ -266,12 +309,16 @@ class MetaViewLogicMixin:
         if not files:
             return
 
-        half_thumbs = max_thumbs // 2
-        start_idx = center_index - half_thumbs
-        end_idx = center_index + half_thumbs + (1 if max_thumbs % 2 else 0)
+        num_files = len(files)
+        if num_files <= max_thumbs:
+            indices = list(range(num_files))
+        else:
+            half_thumbs = max_thumbs // 2
+            start_idx = center_index - half_thumbs
+            end_idx = center_index + half_thumbs + (1 if max_thumbs % 2 else 0)
+            indices = [idx % num_files for idx in range(start_idx, end_idx)]
 
-        for idx in range(start_idx, end_idx):
-            actual_idx = idx % len(files)
+        for actual_idx in indices:
             file_path = files[actual_idx]["path"]
 
             cache_key = (file_path, thumb_size)

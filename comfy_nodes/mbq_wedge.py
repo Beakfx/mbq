@@ -6,7 +6,12 @@ class MBQWedge:
     Parameter sweep (photography-style wedge/bracket).
     Wire INT output → steps/seed offset/etc; FLOAT output → cfg/denoise/guidance/etc.
     ComfyUI greys out incompatible socket types automatically when dragging a link.
-    Number of runs = floor((stop - start) / step_size) + 1, shown live on the node.
+    Number of runs = floor((stop - start) / increment) + 1, shown live on the node.
+
+    The JS extension intercepts Queue and submits one job per value, each with
+    start=stop=V and current=V patched in. Each PNG gets the exact swept value
+    embedded under MBQWedge.inputs.current, readable by MBQ Browser and any tool
+    that inspects PNG text chunks.
     """
 
     @classmethod
@@ -15,9 +20,8 @@ class MBQWedge:
             "required": {
                 "parameter_name": ("STRING", {"default": "connect output →", "multiline": False}),
                 "start":     ("FLOAT", {"default": 1.0,  "min": -99999.0, "max": 99999.0, "step": 0.1}),
-                "step_size": ("FLOAT", {"default": 1.0,  "min": 0.001,    "max": 99999.0, "step": 0.1}),
                 "stop":      ("FLOAT", {"default": 10.0, "min": -99999.0, "max": 99999.0, "step": 0.1}),
-                # "decimals": ("INT", {"default": 2, "min": 0, "max": 6}),  # reserved for future use
+                "increment":  ("FLOAT", {"default": 1.0,  "min": 0.001,    "max": 99999.0, "step": 0.1}),
             }
         }
 
@@ -27,12 +31,12 @@ class MBQWedge:
     FUNCTION       = "sweep"
     CATEGORY       = "MBQ"
 
-    def sweep(self, parameter_name, start, step_size, stop):
+    def sweep(self, parameter_name, start, stop, increment):
         getcontext().prec = 12
-        decimals = 2  # reserved: restore from INPUT_TYPES when needed
+        decimals = 2
         values = []
         v      = Decimal(str(start))
-        d_step = Decimal(str(step_size))
+        d_step = Decimal(str(increment))
         d_stop = Decimal(str(stop))
         while v <= d_stop + Decimal("1e-9"):
             values.append(float(round(v, decimals)))

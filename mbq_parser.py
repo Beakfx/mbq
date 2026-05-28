@@ -207,13 +207,14 @@ def get_wedge_data(prompt_json: dict) -> Optional[dict]:
         return None
 
     param_name    = wedge_params.get("parameter_name", "")
-    current_value = all_params.get(param_name)
+    embedded      = wedge_params.get("current")          # injected by MBQWedgeTag
+    current_value = embedded if embedded is not None else all_params.get(param_name)
 
     return {
         "parameter_name": param_name,
         "current_value":  current_value,
         "start":          wedge_params.get("start"),
-        "step_size":      wedge_params.get("step_size"),
+        "increment":      wedge_params.get("increment"),
         "stop":           wedge_params.get("stop"),
     }
 

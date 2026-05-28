@@ -2,9 +2,9 @@
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QTextEdit, QMessageBox, QFileDialog, QActionGroup,
+    QTextEdit, QMessageBox, QFileDialog,
 )
-from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices
 from PySide6.QtCore import Qt, QTimer, QEvent, QUrl
 from mbq_functions import ImageCanvas, WorkflowCache
 from mbq_parser import get_png_metadata

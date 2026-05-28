@@ -270,7 +270,7 @@ class ImageCanvas(QGraphicsView):
         pad, margin = 8, 12
 
         bg = QGraphicsRectItem(0, 0, tw + pad * 2, th + pad)
-        bg.setBrush(QColor(0, 0, 0, 160))
+        bg.setBrush(QColor(0, 0, 0, 128))
         bg.setPen(Qt.NoPen)
 
         r = self.image_item.boundingRect()
