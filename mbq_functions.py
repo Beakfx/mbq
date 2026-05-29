@@ -2,10 +2,9 @@
 #combines ImageFolder, ImageCanvas, WorkflowCache classes to single file.
 
 from PySide6.QtWidgets import (
-    QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
-    QGraphicsTextItem, QGraphicsRectItem,
+    QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QLabel,
 )
-from PySide6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QPainter, QImageReader, QColor, QFont
+from PySide6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QPainter, QImageReader, QFont
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 import os
@@ -124,7 +123,8 @@ class ImageCanvas(QGraphicsView):
         self._middle_press_pos = None
         self._zoom_anchor_vp = None
         self._zoom_anchor_scene = None
-        self._overlay_items: list = []
+        self._overlay_label: QLabel | None = None
+        self._wedge_corner: str = "bottom_left"
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Right, Qt.Key_Left):
@@ -221,9 +221,9 @@ class ImageCanvas(QGraphicsView):
     def _show_pixmap(self, pixmap: QPixmap):
         if self.zoom_locked:
             saved_transform = self.transform()
-            saved_center = self.mapToScene(self.viewport().rect().center())
+            saved_h = self.horizontalScrollBar().value()
+            saved_v = self.verticalScrollBar().value()
 
-        self._overlay_items = []   # drop refs before scene.clear() deletes C++ objects
         self.scene.clear()
         self.image_item = QGraphicsPixmapItem(pixmap)
         self.image_item.setTransformationMode(Qt.SmoothTransformation)
@@ -234,7 +234,8 @@ class ImageCanvas(QGraphicsView):
 
         if self.zoom_locked:
             self.setTransform(saved_transform)
-            self.centerOn(saved_center)
+            self.horizontalScrollBar().setValue(saved_h)
+            self.verticalScrollBar().setValue(saved_v)
         else:
             self.resetTransform()   # 1:1 (100%)
             self.centerOn(rect.center())
@@ -254,39 +255,46 @@ class ImageCanvas(QGraphicsView):
             self.centerOn(self.image_item.boundingRect().center())
 
     def set_wedge_overlay(self, text: str | None, corner: str = "bottom_left"):
-        for item in self._overlay_items:
-            if item.scene():
-                self.scene.removeItem(item)
-        self._overlay_items = []
-        if not text or not self.image_item:
+        self._wedge_corner = corner
+        if self._overlay_label is None:
+            lbl = QLabel(self.viewport())
+            lbl.setStyleSheet(
+                "color: white; background-color: rgba(0,0,0,160);"
+                " padding: 4px 10px; border-radius: 3px;"
+                " font: bold 14px 'Courier New';"
+            )
+            lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
+            lbl.hide()
+            self._overlay_label = lbl
+        if not text:
+            self._overlay_label.hide()
             return
+        self._overlay_label.setText(text)
+        self._overlay_label.adjustSize()
+        self._reposition_overlay()
+        self._overlay_label.show()
+        self._overlay_label.raise_()
 
-        font = QFont("Courier New", 18, QFont.Bold)
-        text_item = QGraphicsTextItem(text)
-        text_item.setFont(font)
-        text_item.setDefaultTextColor(QColor(255, 255, 255))
-        tw = text_item.boundingRect().width()
-        th = text_item.boundingRect().height()
-        pad, margin = 8, 12
-
-        bg = QGraphicsRectItem(0, 0, tw + pad * 2, th + pad)
-        bg.setBrush(QColor(0, 0, 0, 128))
-        bg.setPen(Qt.NoPen)
-
-        r = self.image_item.boundingRect()
+    def _reposition_overlay(self):
+        lbl = self._overlay_label
+        if lbl is None or not lbl.isVisible():
+            return
+        margin = 12
+        w, h  = lbl.width(), lbl.height()
+        vw    = self.viewport().width()
+        vh    = self.viewport().height()
         positions = {
-            "bottom_left":  (r.left()  + margin,              r.bottom() - th - pad - margin),
-            "bottom_right": (r.right() - tw - pad*2 - margin, r.bottom() - th - pad - margin),
-            "top_left":     (r.left()  + margin,              r.top() + margin),
-            "top_right":    (r.right() - tw - pad*2 - margin, r.top() + margin),
+            "bottom_left":  (margin,          vh - h - margin),
+            "bottom_right": (vw - w - margin, vh - h - margin),
+            "top_left":     (margin,          margin),
+            "top_right":    (vw - w - margin, margin),
         }
-        x, y = positions.get(corner, positions["bottom_left"])
-        bg.setPos(x, y)
-        text_item.setPos(x + pad, y + pad / 2)
+        x, y = positions.get(self._wedge_corner, positions["bottom_left"])
+        lbl.move(x, y)
 
-        self.scene.addItem(bg)
-        self.scene.addItem(text_item)
-        self._overlay_items = [bg, text_item]
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_overlay()
 
 
 

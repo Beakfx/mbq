@@ -16,9 +16,10 @@ import sys
 class StatusBulb(QLabel):
     _COLORS = {"on": "#44cc44", "warn": "#c8823a", "off": "#2a2a2a"}
 
-    def __init__(self, tooltip_name, parent=None):
+    def __init__(self, tooltip_name, parent=None, on_color=None):
         super().__init__(parent)
         self._name = tooltip_name
+        self._on_color = on_color
         self.setFixedSize(14, 14)
         self._state = "off"
         self._apply()
@@ -29,7 +30,7 @@ class StatusBulb(QLabel):
             self._apply()
 
     def _apply(self):
-        c = self._COLORS[self._state]
+        c = self._on_color if (self._state == "on" and self._on_color) else self._COLORS[self._state]
         self.setStyleSheet(f"background:{c}; border-radius:7px; border:1px solid #555;")
         self.setToolTip(f"{self._name}: {'ON' if self._state != 'off' else 'OFF'}")
 
@@ -130,11 +131,13 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
         next_btn = QPushButton("Next Image")
         prev_btn = QPushButton("Previous Image")
-        open_btn = QPushButton("Open Image")
+        open_btn = QPushButton("Open Image ")
 
-        btn_layout.addWidget(next_btn)
-        btn_layout.addWidget(prev_btn)
         btn_layout.addWidget(open_btn)
+        btn_layout.addWidget(prev_btn)
+        btn_layout.addWidget(next_btn)
+
+
 
         # ---- Status Bulbs ----
         btn_layout.addStretch()
@@ -150,7 +153,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
             grp.addWidget(lbl)
             return grp
 
-        self.bulb_wedge  = StatusBulb("Wedge node")
+        self.bulb_wedge  = StatusBulb("Wedge node", on_color="#4499cc")
         self.bulb_zoom   = StatusBulb("Zoom Lock")
         self.bulb_scroll = StatusBulb("Scroll Freeze")
         self.bulb_uncomfy = StatusBulb("UnComfy")
@@ -241,8 +244,12 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.primary_display.installEventFilter(self)
         self.tier3_display.installEventFilter(self)
 
+        copy_row = QHBoxLayout()
         copy_btn = QPushButton("Copy Metadata")
-        metadata_vbox.addWidget(copy_btn)
+        self.copy_prompt_btn = QPushButton("Copy Workflow")
+        copy_row.addWidget(copy_btn)
+        copy_row.addWidget(self.copy_prompt_btn)
+        metadata_vbox.addLayout(copy_row)
 
         self.main_layout.addWidget(self.right_metadata, 0, 2)
 
@@ -260,6 +267,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         edit_menu = menu_bar.addMenu("Edit")
         edit_menu.addAction("Copy Image", self._copy_image)
         edit_menu.addAction("Copy Workflow", self._copy_workflow)
+        edit_menu.addAction("Copy Workflow", self._copy_prompt_json)
 
         # View
         view_menu = menu_bar.addMenu("View")
@@ -300,6 +308,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         next_btn.clicked.connect(self.show_next_image)
         prev_btn.clicked.connect(self.show_prev_image)
         copy_btn.clicked.connect(self._copy_workflow)
+        self.copy_prompt_btn.clicked.connect(self._copy_prompt_json)
 
         QTimer.singleShot(100, self.initialize_scale)
         self.installEventFilter(self)
@@ -322,6 +331,26 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
     def _copy_image(self):
         if self.image_view.image_item:
             QApplication.clipboard().setPixmap(self.image_view.image_item.pixmap())
+
+    def _copy_prompt_json(self):
+        if not self.folder_model:
+            return
+        current = self.folder_model.current()
+        if not current:
+            return
+        md = self.get_workflow_data(current["path"])
+        if not md:
+            return
+        # Prefer the workflow chunk (LiteGraph format ComfyUI loads natively).
+        # Fall back to the prompt chunk serialised as JSON (API format).
+        text = md.get("raw_workflow")
+        if not text:
+            import json
+            raw = md.get("raw_prompt")
+            if raw:
+                text = json.dumps(raw, indent=2)
+        if text:
+            QApplication.clipboard().setText(text)
 
     def _copy_workflow(self):
         lines = [

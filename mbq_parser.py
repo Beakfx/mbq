@@ -29,29 +29,27 @@ def _cache_put(path, data: dict):
     _CACHE[k] = data
 
 
-def read_prompt_chunk(file_path: Path) -> Optional[dict]:
-    """Extract the 'prompt' JSON from a PNG's text chunks. Returns None if absent."""
+def _read_png_text_chunks(file_path: Path, want: set[str]) -> dict[str, str]:
+    """Scan a PNG once and return raw text values for the requested chunk keys."""
+    found: dict[str, str] = {}
     try:
         with open(file_path, "rb") as f:
             if f.read(8) != b"\x89PNG\r\n\x1a\n":
-                return None
-
+                return found
             while True:
                 length_bytes = f.read(4)
                 if not length_bytes:
                     break
                 length = struct.unpack(">I", length_bytes)[0]
-                ctype = f.read(4)
-                data = f.read(length)
-                f.read(4)
+                ctype  = f.read(4)
+                data   = f.read(length)
+                f.read(4)                       # CRC
 
                 key = txt = None
-
                 if ctype == b"tEXt":
                     key, _, raw = data.partition(b"\x00")
                     key = key.decode("latin-1", "ignore")
                     txt = raw.decode("utf-8", "ignore")
-
                 elif ctype == b"zTXt":
                     key, _, rest = data.partition(b"\x00")
                     key = key.decode("latin-1", "ignore")
@@ -59,15 +57,14 @@ def read_prompt_chunk(file_path: Path) -> Optional[dict]:
                         txt = zlib.decompress(rest[1:]).decode("utf-8", "ignore")
                     except Exception:
                         pass
-
                 elif ctype == b"iTXt":
                     key, _, rest = data.partition(b"\x00")
                     key = key.decode("latin-1", "ignore")
                     try:
                         if len(rest) >= 2:
                             comp_flag = rest[0]
-                            payload = rest[2:]
-                            parts = payload.split(b"\x00", 2)
+                            payload   = rest[2:]
+                            parts     = payload.split(b"\x00", 2)
                             txt_bytes = parts[2] if len(parts) == 3 else payload
                             if comp_flag:
                                 txt_bytes = zlib.decompress(txt_bytes)
@@ -75,16 +72,27 @@ def read_prompt_chunk(file_path: Path) -> Optional[dict]:
                     except Exception:
                         pass
 
-                if key == "prompt" and txt:
-                    try:
-                        return json.loads(txt)
-                    except json.JSONDecodeError:
-                        return None
+                if key in want and txt:
+                    found[key] = txt
+                    if found.keys() == want:
+                        break           # got everything we need early
 
                 if ctype == b"IEND":
                     break
     except Exception:
         pass
+    return found
+
+
+def read_prompt_chunk(file_path: Path) -> Optional[dict]:
+    """Extract the 'prompt' JSON from a PNG's text chunks. Returns None if absent."""
+    chunks = _read_png_text_chunks(file_path, {"prompt"})
+    txt = chunks.get("prompt")
+    if txt:
+        try:
+            return json.loads(txt)
+        except json.JSONDecodeError:
+            pass
     return None
 
 
@@ -220,16 +228,25 @@ def get_wedge_data(prompt_json: dict) -> Optional[dict]:
 
 
 def get_png_metadata(file_path: str | Path) -> dict:
-    """Return {"tiers": ..., "saveimage_prefixes": [...], "wedge": ...} or {} if no prompt chunk."""
+    """Return parsed metadata dict or {} if no prompt chunk."""
     path = Path(file_path)
     if (cached := _cache_get(path)) is not None:
         return cached
-    prompt_json = read_prompt_chunk(path)
+    chunks = _read_png_text_chunks(path, {"prompt", "workflow"})
+    prompt_txt = chunks.get("prompt")
+    prompt_json = None
+    if prompt_txt:
+        try:
+            prompt_json = json.loads(prompt_txt)
+        except json.JSONDecodeError:
+            pass
     if prompt_json is not None:
         result = {
             "tiers":              tier_prompt_nodes(prompt_json),
             "saveimage_prefixes": _saveimage_prefixes(prompt_json),
             "wedge":              get_wedge_data(prompt_json),
+            "raw_prompt":         prompt_json,
+            "raw_workflow":       chunks.get("workflow"),   # LiteGraph JSON string, or None
         }
     else:
         result = {}

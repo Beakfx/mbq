@@ -23,22 +23,29 @@ function updateCurrent(node) {
     const cur = node.widgets?.find(w => w.name === "_current");
     if (!w || !cur) return;
     const v = parseFloat(w.value);
-    cur.value = isNaN(v) ? "—" : v.toFixed(2);
+    if (isNaN(v)) { cur.value = "—"; return; }
+    cur.value = node._mbqIsInt ? String(Math.round(v)) : v.toFixed(2);
 }
 
-// Only changes display precision — never touches w.value to avoid callback loops.
-// Python already rounds INT output correctly via int(round(x)).
-function updateWidgetMode(node) {
-    const isInt = (node.outputs?.[0]?.links?.length ?? 0) > 0;
+function updateWidgetMode(node, isInt) {
+    node._mbqIsInt = !!isInt;
     for (const name of ["start", "stop", "increment"]) {
         const w = node.widgets?.find(w => w.name === name);
-        if (!w) continue;
-        w.options = w.options ?? {};
-        w.options.precision = isInt ? 0 : 2;
+        if (!w || !w.options) continue;
+        if (isInt) {
+            // Save original precision on first INT connection, then force 0 decimals.
+            if (w._mbqOrigPrecision === undefined) w._mbqOrigPrecision = w.options.precision;
+            w.options.precision = 0;
+            if (typeof w.value === "number") w.value = Math.round(w.value);
+        } else {
+            // Restore saved precision when switching back to FLOAT mode.
+            if (w._mbqOrigPrecision !== undefined) {
+                w.options.precision = w._mbqOrigPrecision;
+                delete w._mbqOrigPrecision;
+            }
+        }
     }
 }
-
-
 
 app.registerExtension({
     name: "MBQ.Wedge",
@@ -82,7 +89,7 @@ app.registerExtension({
                     };
                 }
             }
-            updateWidgetMode(this);
+            updateWidgetMode(this, (this.outputs?.[0]?.links?.length ?? 0) > 0);
             updateIterations(this);
             updateCurrent(this);
         };
@@ -111,7 +118,10 @@ app.registerExtension({
                     }
                 }
             }
-            updateWidgetMode(this);
+            const isInt = (connected && link_info)
+                ? link_info.origin_slot === 0
+                : (this.outputs?.[0]?.links?.length ?? 0) > 0;
+            updateWidgetMode(this, isInt);
             updateIterations(this);
             app.graph?.setDirtyCanvas(true, true);
         };
@@ -150,15 +160,40 @@ app.registerExtension({
             }
             if (values.length === 0) return _origQueue(number, data);
 
+            const patchWedge = (p, val) => {
+                if (p[wedgeId]) {
+                    p[wedgeId].inputs.start     = val;
+                    p[wedgeId].inputs.stop      = val;
+                    p[wedgeId].inputs.increment = 1.0;
+                    p[wedgeId].inputs.current   = val;
+                }
+            };
+
             const key = "output" in data ? "output" : "prompt";
             let lastResult;
-            for (const val of values) {
-                const patched = JSON.parse(JSON.stringify(prompt));
-                patched[wedgeId].inputs.start     = val;
-                patched[wedgeId].inputs.stop      = val;
-                patched[wedgeId].inputs.increment = 1.0;
-                patched[wedgeId].inputs.current   = val;
-                lastResult = await _origQueue(number, { ...data, [key]: patched });
+            for (let i = 0; i < values.length; i++) {
+                let currentPrompt;
+
+                if (i === 0) {
+                    currentPrompt = JSON.parse(JSON.stringify(prompt));
+                } else {
+                    // Fire afterQueued on every graph widget so seeds advance per their
+                    // control_after_generate setting (randomize/increment/decrement/fixed),
+                    // then re-serialize the graph to capture the updated seed values.
+                    for (const node of app.graph?.nodes ?? []) {
+                        for (const widget of node.widgets ?? []) {
+                            if (typeof widget.afterQueued === "function") widget.afterQueued();
+                        }
+                    }
+                    try {
+                        const fresh = await app.graphToPrompt();
+                        currentPrompt = fresh.output ?? fresh.prompt;
+                    } catch (_) {}
+                    if (!currentPrompt) currentPrompt = JSON.parse(JSON.stringify(prompt));
+                }
+
+                patchWedge(currentPrompt, values[i]);
+                lastResult = await _origQueue(number, { ...data, [key]: currentPrompt });
             }
             return lastResult;
         };

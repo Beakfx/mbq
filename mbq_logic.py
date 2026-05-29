@@ -135,7 +135,7 @@ class MetaViewLogicMixin:
                         new_p = {}
                         if "parameter_name" in p:
                             new_p["parameter_name"] = p["parameter_name"]
-                        new_p["current"] = f"{wedge_val:.2f}"
+                        new_p["current"] = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
                         new_p.update({k: v for k, v in p.items() if k != "parameter_name"})
                         node["params"] = new_p
                         break
@@ -165,6 +165,7 @@ class MetaViewLogicMixin:
 
             self.bulb_uncomfy.set_state("warn" if is_preview else "off")
             self.bulb_wedge.set_state("on" if wedge else "off")
+            self.copy_prompt_btn.setEnabled(True)
         else:
             self.primary_display.setPlainText("(no ComfyUI metadata)")
             self.tier3_display.setPlainText("")
@@ -172,9 +173,14 @@ class MetaViewLogicMixin:
             self.tier3_btn.setVisible(False)
             self.bulb_uncomfy.set_state("warn")
             self.bulb_wedge.set_state("off")
+            self.copy_prompt_btn.setEnabled(False)
 
         # Canvas overlay
-        overlay_text = f"{wedge['parameter_name']}: {wedge_val:.2f}" if wedge and wedge_val is not None else None
+        if wedge and wedge_val is not None:
+            val_str = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
+            overlay_text = f"{wedge['parameter_name']}: {val_str}"
+        else:
+            overlay_text = None
         self.image_view.set_wedge_overlay(overlay_text, getattr(self, "_wedge_corner", "bottom_left"))
 
     def toggle_tier3(self):
