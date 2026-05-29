@@ -38,6 +38,9 @@ Thumbs.db
 *.qmlc
 *.pyqt.*
 
-# Custom paths
-T:/
-W:/
+# Test images and local dev data
+images/
+data/
+
+# Claude Code IDE settings
+.claude/
