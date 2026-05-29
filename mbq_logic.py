@@ -2,8 +2,8 @@ import html as _html
 import os
 import re
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QPixmap, QPainter
+from PySide6.QtCore import Qt, QTimer, QMimeData, QUrl
+from PySide6.QtGui import QPixmap, QPainter, QDrag
 from PySide6.QtWidgets import QFileDialog, QLabel
 from mbq_functions import ImageFolder
 from mbq_parser import get_png_metadata
@@ -348,7 +348,36 @@ class MetaViewLogicMixin:
             lbl.setFixedSize(thumb_size, thumb_size)
             lbl.setStyleSheet("border: 2px solid #22aa33;" if actual_idx == center_index else "border: 1px solid #444;")
             lbl.setCursor(Qt.PointingHandCursor)
-            lbl.mousePressEvent = lambda e, idx=actual_idx: self.jump_to_index(idx)
+
+            def _press(e, w=lbl):
+                if e.button() == Qt.LeftButton:
+                    w._drag_start = e.position().toPoint()
+
+            def _move(e, path=file_path, w=lbl):
+                if not (e.buttons() & Qt.LeftButton):
+                    return
+                start = getattr(w, '_drag_start', None)
+                if start is None or (e.position().toPoint() - start).manhattanLength() < 8:
+                    return
+                w._drag_start = None
+                drag = QDrag(w)
+                mime = QMimeData()
+                mime.setUrls([QUrl.fromLocalFile(path)])
+                drag.setMimeData(mime)
+                px = w.pixmap().scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                drag.setPixmap(px)
+                drag.setHotSpot(px.rect().center())
+                drag.exec(Qt.CopyAction)
+
+            def _release(e, idx=actual_idx, w=lbl):
+                if e.button() == Qt.LeftButton:
+                    start = getattr(w, '_drag_start', None)
+                    if start is not None and (e.position().toPoint() - start).manhattanLength() < 8:
+                        self.jump_to_index(idx)
+
+            lbl.mousePressEvent   = _press
+            lbl.mouseMoveEvent    = _move
+            lbl.mouseReleaseEvent = _release
             self.thumb_layout.addWidget(lbl)
 
     def open_image_file(self):

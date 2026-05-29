@@ -119,12 +119,23 @@ class ImageCanvas(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.NoAnchor)
 
         self.zoom_locked = False
+        self.fit_locked  = False
         self._pan_start = None
         self._middle_press_pos = None
         self._zoom_anchor_vp = None
         self._zoom_anchor_scene = None
         self._overlay_label: QLabel | None = None
         self._wedge_corner: str = "bottom_left"
+
+        self._hint_label = QLabel("Drop an image here  ·  Ctrl+O", self.viewport())
+        self._hint_label.setAlignment(Qt.AlignCenter)
+        self._hint_label.setStyleSheet(
+            "color: #555; font: 16px 'Courier New'; background: transparent;"
+        )
+        self._hint_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._hint_label.setGeometry(0, 0,
+            self.viewport().width(), self.viewport().height())
+        self._hint_label.show()
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Right, Qt.Key_Left):
@@ -224,6 +235,8 @@ class ImageCanvas(QGraphicsView):
             saved_h = self.horizontalScrollBar().value()
             saved_v = self.verticalScrollBar().value()
 
+        if self._hint_label:
+            self._hint_label.hide()
         self.scene.clear()
         self.image_item = QGraphicsPixmapItem(pixmap)
         self.image_item.setTransformationMode(Qt.SmoothTransformation)
@@ -236,6 +249,8 @@ class ImageCanvas(QGraphicsView):
             self.setTransform(saved_transform)
             self.horizontalScrollBar().setValue(saved_h)
             self.verticalScrollBar().setValue(saved_v)
+        elif self.fit_locked:
+            self.fit_zoom()
         else:
             self.resetTransform()   # 1:1 (100%)
             self.centerOn(rect.center())
@@ -253,6 +268,16 @@ class ImageCanvas(QGraphicsView):
         if self.image_item:
             self.resetTransform()
             self.centerOn(self.image_item.boundingRect().center())
+
+    def fit_zoom(self):
+        if not self.image_item:
+            return
+        r = self.image_item.boundingRect()
+        vw, vh = self.viewport().width(), self.viewport().height()
+        scale = min(vw / r.width(), vh / r.height())
+        self.resetTransform()
+        self.scale(scale, scale)
+        self.centerOn(r.center())
 
     def set_wedge_overlay(self, text: str | None, corner: str = "bottom_left"):
         self._wedge_corner = corner
@@ -295,6 +320,10 @@ class ImageCanvas(QGraphicsView):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reposition_overlay()
+        if self._hint_label and self._hint_label.isVisible():
+            self._hint_label.setGeometry(
+                0, 0, self.viewport().width(), self.viewport().height()
+            )
 
 
 

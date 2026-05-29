@@ -153,14 +153,16 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
             grp.addWidget(lbl)
             return grp
 
-        self.bulb_wedge  = StatusBulb("Wedge node", on_color="#4499cc")
+        self.bulb_wedge  = StatusBulb("Wedge node", on_color="#4499dd")
         self.bulb_zoom   = StatusBulb("Zoom Lock")
+        self.bulb_fit    = StatusBulb("Fit Lock", on_color="#44ccaa")
         self.bulb_scroll = StatusBulb("Scroll Freeze")
         self.bulb_uncomfy = StatusBulb("UnComfy")
 
         btn_layout.addLayout(_bulb_group(self.bulb_wedge,   "Wedge"))
-        btn_layout.addLayout(_bulb_group(self.bulb_zoom,    "Zoom"))
-        btn_layout.addLayout(_bulb_group(self.bulb_scroll,  "Scroll"))
+        btn_layout.addLayout(_bulb_group(self.bulb_zoom,    "Zoom (Z)"))
+        btn_layout.addLayout(_bulb_group(self.bulb_fit,     "Fit (F)"))
+        btn_layout.addLayout(_bulb_group(self.bulb_scroll,  "Scroll (S)"))
         btn_layout.addLayout(_bulb_group(self.bulb_uncomfy, "UnComfy"))
 
         center_layout.addWidget(self.button_frame, 2, 0)
@@ -245,7 +247,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.tier3_display.installEventFilter(self)
 
         copy_row = QHBoxLayout()
-        copy_btn = QPushButton("Copy Metadata")
+        copy_btn = QPushButton("Copy Summary")
         self.copy_prompt_btn = QPushButton("Copy Workflow")
         copy_row.addWidget(copy_btn)
         copy_row.addWidget(self.copy_prompt_btn)
@@ -258,15 +260,19 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
         # File
         file_menu = menu_bar.addMenu("File")
-        file_menu.addAction("Open Image", self.open_image_file)
+        open_img_action = QAction("Open Image", self, shortcut="Ctrl+O")
+        open_img_action.triggered.connect(self.open_image_file)
+        file_menu.addAction(open_img_action)
         file_menu.addAction("Open Path", self.open_folder)
         file_menu.addSeparator()
-        file_menu.addAction("Exit", QApplication.instance().quit)
+        exit_action = QAction("Exit", self, shortcut="Ctrl+Q")
+        exit_action.triggered.connect(QApplication.instance().quit)
+        file_menu.addAction(exit_action)
 
         # Edit
         edit_menu = menu_bar.addMenu("Edit")
         edit_menu.addAction("Copy Image", self._copy_image)
-        edit_menu.addAction("Copy Workflow", self._copy_workflow)
+        edit_menu.addAction("Copy Summary", self._copy_workflow)
         edit_menu.addAction("Copy Workflow", self._copy_prompt_json)
 
         # View
@@ -275,8 +281,11 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self._lock_zoom_action.toggled.connect(self._on_zoom_lock_toggled)
         view_menu.addAction(self._lock_zoom_action)
         reset_zoom_action = QAction("Reset Zoom", self, shortcut="R")
-        reset_zoom_action.triggered.connect(self.image_view.reset_zoom)
+        reset_zoom_action.triggered.connect(self._reset_zoom)
         view_menu.addAction(reset_zoom_action)
+        self._fit_lock_action = QAction("Fit Lock", self, checkable=True, shortcut="F")
+        self._fit_lock_action.toggled.connect(self._on_fit_lock_toggled)
+        view_menu.addAction(self._fit_lock_action)
         view_menu.addSeparator()
         self._freeze_scroll_action = QAction("Freeze Scroll", self, checkable=True, shortcut="S")
         self._freeze_scroll_action.toggled.connect(
@@ -327,6 +336,20 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
     def _on_zoom_lock_toggled(self, checked: bool):
         self.image_view.zoom_locked = checked
         self.bulb_zoom.set_state("on" if checked else "off")
+        if checked:
+            self._fit_lock_action.setChecked(False)
+
+    def _on_fit_lock_toggled(self, checked: bool):
+        self.image_view.fit_locked = checked
+        self.bulb_fit.set_state("on" if checked else "off")
+        if checked:
+            self._lock_zoom_action.setChecked(False)
+            self.image_view.fit_zoom()
+
+    def _reset_zoom(self):
+        self._lock_zoom_action.setChecked(False)
+        self._fit_lock_action.setChecked(False)
+        self.image_view.reset_zoom()
 
     def _copy_image(self):
         if self.image_view.image_item:
@@ -371,9 +394,24 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
             self,
             "About MBQ",
             "MBQ — Meta Browser Qt\n"
-            "PySide6 image viewer for ComfyUI PNGs.\n\n"
-            "Reads ComfyUI prompt metadata from PNG text chunks\n"
-            "and displays generation parameters in a side panel.",
+            "An OpenGL-accelerated image viewer built for ComfyUI workflows.\n\n"
+            "Reads the prompt JSON embedded in PNG files by ComfyUI's SaveImage\n"
+            "node and displays generation parameters — model, prompts, sampler,\n"
+            "CFG, seed, steps — in a colour-coded side panel.\n\n"
+            "MBQ Wedge\n"
+            "The companion ComfyUI node sweeps any numeric parameter (steps, CFG,\n"
+            "guidance…) across a range, queuing one job per value. Each output PNG\n"
+            "has its exact swept value embedded; MBQ overlays it on the canvas and\n"
+            "highlights it in the metadata panel.\n\n"
+            "Keyboard shortcuts\n"
+            "  Ctrl+O    open image\n"
+            "  ← / →     previous / next image\n"
+            "  Z          toggle zoom lock\n"
+            "  S          toggle scroll freeze\n"
+            "  R          reset zoom (100%), clear locks\n"
+            "  F          toggle fit lock (auto-fit each image)\n"
+            "  Ctrl+Q    quit\n\n"
+            "github.com/Beakfx/mbq",
         )
 
     def _open_help(self):
