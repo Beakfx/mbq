@@ -42,5 +42,6 @@ Thumbs.db
 images/
 data/
 
-# Claude Code IDE settings
+# Claude Code IDE settings and instructions
 .claude/
+CLAUDE.md
