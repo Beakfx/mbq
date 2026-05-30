@@ -118,16 +118,12 @@ class MetaViewLogicMixin:
         self.tier3_display.setVisible(False)
 
         wedge = md.get("wedge") if md else None
-        wedge_val = None
-        if wedge:
-            wedge_val = wedge.get("current_value")
-            if wedge_val is None:
-                wedge_val = self._infer_wedge_value(file_info["path"], wedge)
+        wedge_val = wedge.get("current_value") if wedge else None
 
         if md and "tiers" in md:
             t1, t2, t3 = md["tiers"]
 
-            # Inject inferred current value into the MBQWedge node block
+            # Inject current value into the MBQWedge node block
             if wedge and wedge_val is not None:
                 for node in t1 + t2:
                     if node.get("class_type", "").startswith("MBQWedge"):
@@ -199,6 +195,30 @@ class MetaViewLogicMixin:
             self.populate_filmstrip()
             self.preload_adjacent_images()
 
+    def refresh_folder(self):
+        if not self.folder_model:
+            return
+        current = self.folder_model.current()
+        current_path = current["path"] if current else None
+        self.folder_model.scan_folder()
+        if current_path:
+            paths = [f["path"] for f in self.folder_model.files]
+            if current_path in paths:
+                self.folder_model.index = paths.index(current_path)
+            else:
+                self.folder_model.index = min(
+                    self.folder_model.index, max(0, len(self.folder_model.files) - 1)
+                )
+        self.image_cache.clear()
+        self.thumb_cache.clear()
+        self.workflow_cache.clear()
+        current = self.folder_model.current()
+        if current:
+            self.display_image(current["path"])
+            self.update_metadata(current)
+        self.populate_filmstrip()
+        self.preload_adjacent_images()
+
     def load_folder_from_path(self, folder_path):
         self.folder_model = ImageFolder(folder_path)
         self.image_cache.clear()
@@ -266,35 +286,6 @@ class MetaViewLogicMixin:
                 self.populate_filmstrip()
                 self.preload_adjacent_images()
 
-    def _infer_wedge_value(self, current_path, wedge):
-        """Infer per-image sweep value by position among folder images with matching wedge config."""
-        if not self.folder_model:
-            return None
-        start = wedge.get("start")
-        step  = wedge.get("increment")
-        if start is None or not step:
-            return None
-
-        files = self.folder_model.files
-        curr_idx = self.folder_model.index
-        window = files[max(0, curr_idx - 100): curr_idx + 101]
-
-        matching = []
-        for f in window:
-            md = self.get_workflow_data(f["path"])
-            if not md:
-                continue
-            w = md.get("wedge")
-            if (w and
-                    w.get("parameter_name") == wedge.get("parameter_name") and
-                    w.get("start") == start and
-                    w.get("increment") == step and
-                    w.get("stop") == wedge.get("stop")):
-                matching.append(f["path"])
-
-        if current_path not in matching:
-            return None
-        return start + matching.index(current_path) * step
 
     def populate_filmstrip(self):
         for i in reversed(range(self.thumb_layout.count())):

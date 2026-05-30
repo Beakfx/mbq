@@ -277,6 +277,10 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
         # View
         view_menu = menu_bar.addMenu("View")
+        refresh_action = QAction("Refresh", self, shortcut="F5")
+        refresh_action.triggered.connect(self.refresh_folder)
+        view_menu.addAction(refresh_action)
+        view_menu.addSeparator()
         self._lock_zoom_action = QAction("Lock Zoom", self, checkable=True, shortcut="Z")
         self._lock_zoom_action.toggled.connect(self._on_zoom_lock_toggled)
         view_menu.addAction(self._lock_zoom_action)
