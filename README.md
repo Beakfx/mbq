@@ -1,6 +1,6 @@
 # MBQ — Meta Browser Qt + Wedge Node for ComfyUI
 
-![MBQ Browser showing a Flux workflow with MBQWedge metadata panel](docs/screenshot.png)
+![MBQ Browser showing a Flux workflow with the metadata panel and filmstrip](docs/screenshot.png)
 
 **MBQ is a parameter sweep tool for ComfyUI, built around a tight two-part loop:**
 
@@ -9,9 +9,9 @@
 | **MBQ Wedge** | A ComfyUI custom node that sweeps any numeric parameter across a range — steps, CFG, guidance, denoise — queuing one image per value with a single click. |
 | **MBQ Browser** | An OpenGL-accelerated desktop image viewer that reads the ComfyUI prompt data embedded in each PNG and overlays the swept parameter value directly on the canvas. |
 
-**The loop:** get a result you like in ComfyUI → freeze the seed → add MBQ Wedge and sweep the parameter you're uncertain about → open the output folder in MBQ Browser → flip through results with the swept value labelled on every image, zoomed into the exact detail you care about.
+**The loop:** get a result you like in ComfyUI → freeze the seed → add MBQ Wedge and sweep the parameter you're uncertain about → open the output folder in MBQ Browser → flip through results with the swept value labelled on every image, zoomed in to the exact detail you care about.
 
-Say you like a scene but aren't sure how many steps you need: sweep `steps` 4 → 12. Want to tune an inpaint blend? Sweep `denoise` 0.4 → 1.0 at 0.05 increments. Works with any float or int input.
+Say you like a scene but aren't sure how many steps you need: sweep `steps` 4 → 12. Want to tune an inpaint blend? Sweep `denoise` 0.4 → 1.0 at 0.05 increments. Works with any float or int input on any node.
 
 ---
 
@@ -38,7 +38,7 @@ Add MBQ Wedge to any workflow and wire one output to a numeric input:
 
 Set `start`, `stop`, and `increment`. Click **Queue once** — the MBQ JS extension intercepts the submission and expands it into N separate jobs, one per sweep value.
 
-Each output PNG has the **exact swept value embedded** in its ComfyUI prompt chunk, so MBQ Browser can read and display it without guessing — even if you rename or move the file.
+Each output PNG has the **exact swept value embedded** in its ComfyUI prompt chunk. MBQ Browser reads it directly — no guessing, no positional inference. Works correctly across multiple batches and renamed files.
 
 Seeds advance correctly across sweep jobs: randomize, increment, decrement, and fixed modes all work as configured.
 
@@ -56,7 +56,7 @@ stop           = 12
 increment      = 1
 ```
 
-Wire `int_value` → BasicScheduler (or KSampler) `steps`. Click Queue → 9 jobs, 9 PNGs, each labelled `steps: 4` through `steps: 12` in MBQ Browser.
+Wire `int_value` → BasicScheduler `steps`. Click Queue → 9 jobs, 9 PNGs, each labelled `steps: 4` through `steps: 12` in MBQ Browser.
 
 ---
 
@@ -82,7 +82,7 @@ Drag images in from Explorer or ComfyUI. Drag thumbnails out to Explorer or Comf
 
 - OpenGL-accelerated — smooth pan (left-drag), scroll-wheel zoom anchored at cursor
 - Middle-click to reset zoom to 100%
-- **Zoom Lock (`Z`)** — preserves the exact pan/zoom when flipping between images, so you can inspect the same crop across the whole sweep
+- **Zoom Lock (`Z`)** — preserves the exact pan and zoom position when flipping between images, so you can inspect the same crop across an entire sweep
 - **Fit Lock (`F`)** — auto-fits every image to the window
 - **Reset (`R`)** — 100% zoom, clears both locks
 
@@ -105,9 +105,8 @@ When a swept image is loaded, MBQ Browser:
 - Lights the **Wedge bulb** (blue) in the status bar
 - Overlays the swept parameter and value on the canvas corner: `steps: 6`
 - Shows `current` in the MBQWedge metadata entry
-- Infers the correct value by position in the folder even if it wasn't explicitly embedded
 
-The overlay is fixed to the canvas corner and unaffected by zoom or pan — it stays readable wherever you're zoomed.
+The overlay is fixed to the canvas corner — unaffected by zoom or pan.
 
 ### Keyboard shortcuts
 
@@ -115,6 +114,7 @@ The overlay is fixed to the canvas corner and unaffected by zoom or pan — it s
 |-----|--------|
 | `Ctrl+O` | Open image |
 | `← / →` | Previous / next image |
+| `F5` | Refresh folder |
 | `Z` | Toggle zoom lock |
 | `F` | Toggle fit lock |
 | `R` | Reset zoom to 100%, clear locks |
@@ -140,7 +140,7 @@ The overlay is fixed to the canvas corner and unaffected by zoom or pan — it s
 | File | Role |
 |------|------|
 | `mbq_browser.py` | Main window — layout, menus, zoom controls, status bulbs, copy actions |
-| `mbq_logic.py` | Navigation, metadata display, filmstrip, wedge value inference |
+| `mbq_logic.py` | Navigation, metadata display, filmstrip |
 | `mbq_functions.py` | `ImageCanvas` (OpenGL view), `ImageFolder`, `WorkflowCache` |
 | `mbq_parser.py` | PNG chunk extraction, ComfyUI prompt graph parsing, three-tier node classification |
 | `comfy_nodes/mbq_wedge.py` | MBQWedge ComfyUI node |

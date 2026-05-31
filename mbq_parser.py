@@ -197,30 +197,46 @@ def _saveimage_prefixes(prompt_json: dict) -> list:
 
 
 def get_wedge_data(prompt_json: dict) -> Optional[dict]:
-    """Return wedge info if an MBQWedge node is present, else None."""
-    wedge_params = None
-    all_params: dict = {}
+    """Return wedge info if an MBQWedge node is wired to a real parameter, else None.
 
-    for node in prompt_json.values():
-        if not isinstance(node, dict):
-            continue
-        ctype = str(node.get("class_type") or "")
-        inputs = _scalar_inputs(node.get("inputs") or {})
-        if ctype == "MBQWedge":
-            wedge_params = inputs
-        else:
-            all_params.update(inputs)
+    Connection is determined by checking whether any other node in the prompt has
+    an input named `parameter_name` wired to the wedge node — the same wire that
+    makes the sweep meaningful. A wedge that is present but not connected (or only
+    connected to display/preview nodes) is silently ignored so the viewer stays clean.
+    The prompt JSON is never modified; this is read-only display logic.
+    """
+    wedge_id     = None
+    wedge_params = None
+
+    for nid, node in prompt_json.items():
+        if isinstance(node, dict) and node.get("class_type") == "MBQWedge":
+            wedge_id     = nid
+            wedge_params = _scalar_inputs(node.get("inputs") or {})
+            break
 
     if wedge_params is None:
         return None
 
-    param_name    = wedge_params.get("parameter_name", "")
-    embedded      = wedge_params.get("current")          # injected by MBQWedgeTag
-    current_value = embedded if embedded is not None else all_params.get(param_name)
+    param_name = wedge_params.get("parameter_name", "")
+    if not param_name:
+        return None
+
+    # Check that some downstream node has an input whose NAME matches parameter_name
+    # and whose value is a wire reference [wedge_id, slot].
+    connected = any(
+        key == param_name
+        and isinstance(v, list) and len(v) >= 1
+        and str(v[0]) == wedge_id
+        for nid, node in prompt_json.items()
+        if nid != wedge_id and isinstance(node, dict)
+        for key, v in (node.get("inputs") or {}).items()
+    )
+    if not connected:
+        return None
 
     return {
         "parameter_name": param_name,
-        "current_value":  current_value,
+        "current_value":  wedge_params.get("current"),
         "start":          wedge_params.get("start"),
         "increment":      wedge_params.get("increment"),
         "stop":           wedge_params.get("stop"),

@@ -21,7 +21,7 @@ class MBQWedge:
                 "parameter_name": ("STRING", {"default": "connect output →", "multiline": False}),
                 "start":     ("FLOAT", {"default": 1.0,  "min": -99999.0, "max": 99999.0, "step": 0.1}),
                 "stop":      ("FLOAT", {"default": 10.0, "min": -99999.0, "max": 99999.0, "step": 0.1}),
-                "increment":  ("FLOAT", {"default": 1.0,  "min": 0.001,    "max": 99999.0, "step": 0.1}),
+                "increment":  ("FLOAT", {"default": 1.0,  "min": 0.001,    "max": 99999.0, "step": 0.05}),
             }
         }
 

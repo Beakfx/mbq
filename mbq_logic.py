@@ -123,18 +123,26 @@ class MetaViewLogicMixin:
         if md and "tiers" in md:
             t1, t2, t3 = md["tiers"]
 
-            # Inject current value into the MBQWedge node block
+            # Pull MBQWedge out of wherever it naturally tiered, then place it:
+            #   active sweep → tier 1 (it's the main thing you're reviewing)
+            #   inactive / disconnected → tier 3 (still visible in plumbing, not hidden)
+            is_mbq = lambda n: n.get("class_type", "").startswith("MBQWedge")
+            mbq_nodes = [n for n in t1 + t2 + t3 if is_mbq(n)]
+            t1 = [n for n in t1 if not is_mbq(n)]
+            t2 = [n for n in t2 if not is_mbq(n)]
+            t3 = [n for n in t3 if not is_mbq(n)]
             if wedge and wedge_val is not None:
-                for node in t1 + t2:
-                    if node.get("class_type", "").startswith("MBQWedge"):
-                        p = node["params"]
-                        new_p = {}
-                        if "parameter_name" in p:
-                            new_p["parameter_name"] = p["parameter_name"]
-                        new_p["current"] = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
-                        new_p.update({k: v for k, v in p.items() if k != "parameter_name"})
-                        node["params"] = new_p
-                        break
+                for node in mbq_nodes:
+                    p = node["params"]
+                    new_p = {}
+                    if "parameter_name" in p:
+                        new_p["parameter_name"] = p["parameter_name"]
+                    new_p["current"] = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
+                    new_p.update({k: v for k, v in p.items() if k != "parameter_name"})
+                    node["params"] = new_p
+                t1 = mbq_nodes + t1
+            else:
+                t3 = t3 + mbq_nodes
 
             primary_html = _build_display_text(t1 + t2)
             if primary_html:

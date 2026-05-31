@@ -206,7 +206,6 @@ class ImageCanvas(QGraphicsView):
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
-            print("drag enter")
         else:
             event.ignore()
 
@@ -223,7 +222,7 @@ class ImageCanvas(QGraphicsView):
                 if os.path.isfile(file_path) and os.path.splitext(file_path)[1].lower() in (
                     ".png", ".jpg", ".jpeg", ".bmp", ".gif"
                 ):
-                    self.fileDropped.emit(file_path)   # 👈 hand off to parent
+                    self.fileDropped.emit(file_path)
                     event.acceptProposedAction()
                     return
         event.ignore()
@@ -296,13 +295,13 @@ class ImageCanvas(QGraphicsView):
             return
         self._overlay_label.setText(text)
         self._overlay_label.adjustSize()
-        self._reposition_overlay()
         self._overlay_label.show()
+        self._reposition_overlay()
         self._overlay_label.raise_()
 
     def _reposition_overlay(self):
         lbl = self._overlay_label
-        if lbl is None or not lbl.isVisible():
+        if lbl is None:
             return
         margin = 12
         w, h  = lbl.width(), lbl.height()

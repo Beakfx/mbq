@@ -1,5 +1,6 @@
 import { app } from "/scripts/app.js";
 import { api } from "/scripts/api.js";
+import { ComfyWidgets } from "/scripts/widgets.js";
 
 function updateIterations(node) {
     if (node._mbqUpdating) return;
@@ -27,24 +28,61 @@ function updateCurrent(node) {
     cur.value = node._mbqIsInt ? String(Math.round(v)) : v.toFixed(2);
 }
 
+// Rebuild the three numeric widgets as genuine INT or FLOAT widgets using
+// ComfyUI's own factory (ComfyWidgets.INT / .FLOAT). This gives native arrow
+// stepping, precision and slider feel for the connected type — instead of
+// mutating a live FLOAT widget's options (which desyncs the reactive binding
+// and breaks the arrows). Each rebuilt widget is spliced back into its original
+// index so saved workflows deserialize values into the right slots.
+const MBQ_NUMS = ["start", "stop", "increment"];
+
+function rebuildNumberWidgets(node, mode) {
+    const type = mode === "int" ? "INT" : "FLOAT";
+    for (const name of MBQ_NUMS) {
+        const old = node.widgets?.find(w => w.name === name);
+        if (!old) continue;
+        const idx = node.widgets.indexOf(old);
+
+        let val = parseFloat(old.value);
+        if (isNaN(val)) val = 0;
+        if (mode === "int") val = Math.round(val);
+        const min = (name === "increment") ? (mode === "int" ? 1 : 0.001) : -99999;
+        // FLOAT precision is derived from step (precision = -floor(log10(step))).
+        // increment uses 0.05 → precision 2, so values like 0.05 are typeable;
+        // start/stop keep 0.1 → precision 1 for coarser arrow stepping.
+        const step = mode === "int" ? 1 : (name === "increment" ? 0.05 : 0.1);
+
+        node.widgets.splice(idx, 1);   // drop old widget
+        const res = ComfyWidgets[type](node, name, [type, { default: val, min, max: 99999, step }], app);
+        const w = res.widget;
+
+        const appended = node.widgets.indexOf(w);   // factory pushed it to the end
+        if (appended !== -1) node.widgets.splice(appended, 1);
+        node.widgets.splice(idx, 0, w);             // restore original position
+        w.value = val;
+
+        const orig = w.callback;
+        w.callback = function(...args) {
+            orig?.apply(this, args);
+            updateIterations(node);
+            updateCurrent(node);
+        };
+    }
+    node.setDirtyCanvas?.(true, true);
+}
+
 function updateWidgetMode(node, isInt) {
     node._mbqIsInt = !!isInt;
-    for (const name of ["start", "stop", "increment"]) {
-        const w = node.widgets?.find(w => w.name === name);
-        if (!w || !w.options) continue;
-        if (isInt) {
-            // Save original precision on first INT connection, then force 0 decimals.
-            if (w._mbqOrigPrecision === undefined) w._mbqOrigPrecision = w.options.precision;
-            w.options.precision = 0;
-            if (typeof w.value === "number") w.value = Math.round(w.value);
-        } else {
-            // Restore saved precision when switching back to FLOAT mode.
-            if (w._mbqOrigPrecision !== undefined) {
-                w.options.precision = w._mbqOrigPrecision;
-                delete w._mbqOrigPrecision;
-            }
-        }
+    const mode = isInt ? "int" : "float";
+    // The Python node already creates FLOAT widgets, so the initial float state
+    // needs no rebuild — just record it. Only rebuild on an actual mode change.
+    if (node._mbqWidgetMode === undefined && mode === "float") {
+        node._mbqWidgetMode = "float";
+        return;
     }
+    if (node._mbqWidgetMode === mode) return;
+    node._mbqWidgetMode = mode;
+    rebuildNumberWidgets(node, mode);
 }
 
 app.registerExtension({
@@ -52,7 +90,6 @@ app.registerExtension({
 
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== "MBQWedge") return;
-        console.log("[MBQ Wedge] JS extension loaded");
 
         nodeType.prototype.onNodeCreated = function() {
             const lbl = this.addWidget("text", "_iterations", "—", () => {}, { serialize: false });
