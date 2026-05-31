@@ -1,6 +1,6 @@
 # MBQ Viewer + Wedge Node for ComfyUI
 
-![MBQ Viewer showing a Flux workflow with the metadata panel and filmstrip](docs/screenshot.png)
+![MBQ Viewer showing a Flux workflow with the metadata panel and filmstrip](assets/screenshot.png)
 
 **MBQ is a parameter sweep tool for ComfyUI, built around a tight two-part loop:**
 
@@ -19,7 +19,7 @@ Say you like a scene but aren't sure how many steps you need: sweep `steps` 4 �
 
 ### Install
 
-Copy (or symlink) the `comfy_nodes/` folder into your ComfyUI custom nodes directory and restart ComfyUI:
+Copy (or symlink) the `comfy_nodes/` folder into your ComfyUI custom nodes directory, renaming it `ComfyUI-MBQWedge`, then restart ComfyUI:
 
 ```
 ComfyUI/custom_nodes/ComfyUI-MBQWedge/
@@ -99,12 +99,14 @@ Colour coding: cyan node headers · yellow keys · near-white values
 **Copy Summary** — plain-text summary for notes or sharing  
 **Copy Workflow** — raw LiteGraph JSON for direct re-import into ComfyUI
 
+**Scroll Freeze (`S`)** — locks the workflow panel's scroll position when flipping between images, so the same section of the metadata stays in view across an entire sweep.
+
 ### MBQ Wedge integration
 
 When a swept image is loaded, MBQ Viewer:
 - Lights the **Wedge bulb** (blue) in the status bar
 - Overlays the swept parameter and value on the canvas corner: `steps: 6`
-- Shows `current` in the MBQWedge metadata entry
+- Highlights the swept value in the Workflow panel's MBQWedge entry
 
 The overlay is fixed to the canvas corner — unaffected by zoom or pan.
 
@@ -155,3 +157,7 @@ The overlay is fixed to the canvas corner — unaffected by zoom or pan.
 - **Soft-fail.** If a PNG has no prompt chunk, MBQ shows the image and leaves the workflow panel blank — it never crashes or shows garbage.
 - **No ComfyUI runtime dependency.** MBQ Viewer reads PNG files directly; ComfyUI does not need to be running.
 - **Cross-platform.** Developed on Windows; should work on Linux. Mac support is untested.
+
+---
+
+**[github.com/Beakfx/mbq](https://github.com/Beakfx/mbq)**
