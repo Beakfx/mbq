@@ -62,7 +62,7 @@ def _is_preview_save(filename: str, saveimage_prefixes: list) -> bool:
     return True
 
 
-class MetaViewLogicMixin:
+class MBQViewerLogicMixin:
     """All behavior logic — no UI creation."""
 
     def keyPressEvent(self, event):

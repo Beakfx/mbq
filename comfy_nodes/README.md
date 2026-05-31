@@ -65,7 +65,7 @@ Wire `float_value` → KSampler `cfg`. Click Queue → 5 separate jobs submitted
 
 When you click Queue, the MBQ JS extension intercepts the submission and expands it into
 N individual jobs — one per sweep value. Each job has the swept value patched directly
-into MBQWedge's inputs (`start=V, stop=V, increment=1, current=V`), so the PNG produced
+into MBQWedge's inputs (`start=V, stop=V, current=V`), so the PNG produced
 by each job carries the exact value in its embedded prompt chunk.
 
 This is the same mechanism ComfyUI uses for per-image seed randomization.

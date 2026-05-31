@@ -8,7 +8,7 @@ from PySide6.QtGui import QAction, QActionGroup, QDesktopServices
 from PySide6.QtCore import Qt, QTimer, QEvent, QUrl
 from mbq_functions import ImageCanvas, WorkflowCache
 from mbq_parser import get_png_metadata
-from mbq_logic import MetaViewLogicMixin
+from mbq_logic import MBQViewerLogicMixin
 
 import sys
 
@@ -35,10 +35,10 @@ class StatusBulb(QLabel):
         self.setToolTip(f"{self._name}: {'ON' if self._state != 'off' else 'OFF'}")
 
 
-class MetaViewApp(MetaViewLogicMixin, QMainWindow):
+class MBQViewerApp(MBQViewerLogicMixin, QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("MBQ — Meta Browser")
+        self.setWindowTitle("MBQ Viewer")
         self.workflow_cache = WorkflowCache(max_size=50)
 
         self.resize(1400, 900)
@@ -389,7 +389,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         QMessageBox.about(
             self,
             "About MBQ",
-            "MBQ — Meta Browser Qt\n"
+            "MBQ Viewer\n"
             "An OpenGL-accelerated image viewer built for ComfyUI workflows.\n\n"
             "Reads the prompt JSON embedded in PNG files by ComfyUI's SaveImage\n"
             "node and displays generation parameters — model, prompts, sampler,\n"
@@ -440,7 +440,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MetaViewApp()
+    window = MBQViewerApp()
     window.show()
     if len(sys.argv) > 1:
         import os

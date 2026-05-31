@@ -10,7 +10,7 @@ class MBQWedge:
 
     The JS extension intercepts Queue and submits one job per value, each with
     start=stop=V and current=V patched in. Each PNG gets the exact swept value
-    embedded under MBQWedge.inputs.current, readable by MBQ Browser and any tool
+    embedded under MBQWedge.inputs.current, readable by MBQ Viewer and any tool
     that inspects PNG text chunks.
     """
 
