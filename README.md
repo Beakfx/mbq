@@ -147,7 +147,6 @@ The overlay is fixed to the canvas corner — unaffected by zoom or pan.
 | `mbq_parser.py` | PNG chunk extraction, ComfyUI prompt graph parsing, three-tier node classification |
 | `comfy_nodes/mbq_wedge.py` | MBQWedge ComfyUI node |
 | `comfy_nodes/js/mbq_wedge.js` | JS extension: widgets, queue intercept, seed handling |
-| `dump_png_text_chunks.py` | CLI debug tool: dump raw PNG text chunks |
 
 ---
 

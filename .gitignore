@@ -45,3 +45,4 @@ data/
 # Claude Code IDE settings and instructions
 .claude/
 CLAUDE.md
+dump_png_text_chunks.py
