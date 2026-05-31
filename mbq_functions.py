@@ -1,4 +1,5 @@
-#mbq_functions.py 
+#mbq_functions.py
+#© Beakfx, 2026
 #combines ImageFolder, ImageCanvas, WorkflowCache classes to single file.
 
 from PySide6.QtWidgets import (
@@ -53,7 +54,6 @@ class ImageFolder:
                 "name": f.name,
                 "size": f.stat().st_size,
                 "modified": datetime.fromtimestamp(f.stat().st_mtime),
-                "chunks": {},  # placeholder for PNG/genAI metadata
             }
 
             # Sniff image dimensions without loading fully
@@ -363,26 +363,7 @@ class WorkflowCache:
         self.cache[file_path] = workflow_data
         self.access_order.append(file_path)
     
-    def preload_batch(self, file_paths, parser_func, max_preload=10):
-        """Preload workflows for multiple files"""
-        for file_path in file_paths[:max_preload]:
-            if file_path not in self.cache:
-                try:
-                    workflow_data = parser_func(file_path)
-                    self.put(file_path, workflow_data)
-                except Exception as e:
-                    print(f"Failed to preload workflow for {file_path}: {e}")
-    
     def clear(self):
-        """Clear the cache"""
         self.cache.clear()
         self.access_order.clear()
-    
-    def stats(self):
-        """Get cache statistics"""
-        return {
-            'size': len(self.cache),
-            'max_size': self.max_size,
-            'usage_ratio': len(self.cache) / self.max_size
-        }
 

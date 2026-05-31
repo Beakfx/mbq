@@ -75,18 +75,6 @@ class MetaViewLogicMixin:
         else:
             super().keyPressEvent(event)
 
-    def initialize_scale(self):
-        self.update_scale_factor()
-        if self.folder_model:
-            self.populate_filmstrip()
-
-    def update_scale_factor(self):
-        if not hasattr(self, "image_view"):
-            return
-        avail_w = self.image_view.width()
-        avail_h = self.image_view.height()
-        self.scale_factor = min(avail_w / self.design_canvas_w, avail_h / self.design_canvas_h)
-
     def update_metadata(self, file_info):
         """Update the metadata panel for the current image."""
         self.file_name_value.setText(file_info["name"])

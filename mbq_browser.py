@@ -46,14 +46,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.folder_model = None
         self.image_cache = {}
         self.thumb_cache = {}
-        self.cache_size = 5
 
-        self.design_canvas_w = 1024
-        self.design_canvas_h = 768
-        self.design_thumb_w = 120
-        self.design_thumb_h = 90
-
-        self.scale_factor = 1.0
         self._wedge_corner = "bottom_left"
 
         # ---- Central Widget ----
@@ -77,7 +70,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         self.main_layout.addWidget(self.left_spacer, 0, 0)
 
         # --- Center Image Area ---
-        self.center_group = QGroupBox("Image View")
+        self.center_group = QGroupBox("Image")
         self.center_group.setStyleSheet("""
             QGroupBox {
                 border: 2px solid #333333;
@@ -129,8 +122,8 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         btn_layout = QHBoxLayout(self.button_frame)
         btn_layout.setContentsMargins(0, 2, 0, 2)
 
-        next_btn = QPushButton("Next Image")
-        prev_btn = QPushButton("Previous Image")
+        next_btn = QPushButton("Next Image  ▶")
+        prev_btn = QPushButton("◀  Previous Image")
         open_btn = QPushButton("Open Image ")
 
         btn_layout.addWidget(open_btn)
@@ -168,7 +161,7 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         center_layout.addWidget(self.button_frame, 2, 0)
 
         # --- Right Metadata Panel ---
-        self.right_metadata = QGroupBox("Metadata")
+        self.right_metadata = QGroupBox("Workflow")
         self.right_metadata.setMinimumWidth(300)
 
         metadata_vbox = QVBoxLayout()
@@ -323,7 +316,6 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
         copy_btn.clicked.connect(self._copy_workflow)
         self.copy_prompt_btn.clicked.connect(self._copy_prompt_json)
 
-        QTimer.singleShot(100, self.initialize_scale)
         self.installEventFilter(self)
 
         zoom_timer = QTimer(self)
@@ -444,9 +436,6 @@ class MetaViewApp(MetaViewLogicMixin, QMainWindow):
 
     def get_workflow_data(self, file_path):
         return self.workflow_cache.get(file_path, get_png_metadata)
-
-    def preload_workflows(self, file_paths):
-        self.workflow_cache.preload_batch(file_paths, get_png_metadata)
 
 
 if __name__ == "__main__":

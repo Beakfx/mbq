@@ -199,10 +199,9 @@ app.registerExtension({
 
             const patchWedge = (p, val) => {
                 if (p[wedgeId]) {
-                    p[wedgeId].inputs.start     = val;
-                    p[wedgeId].inputs.stop      = val;
-                    p[wedgeId].inputs.increment = 1.0;
-                    p[wedgeId].inputs.current   = val;
+                    p[wedgeId].inputs.start   = val;
+                    p[wedgeId].inputs.stop    = val;
+                    p[wedgeId].inputs.current = val;
                 }
             };
 

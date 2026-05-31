@@ -84,17 +84,6 @@ def _read_png_text_chunks(file_path: Path, want: set[str]) -> dict[str, str]:
     return found
 
 
-def read_prompt_chunk(file_path: Path) -> Optional[dict]:
-    """Extract the 'prompt' JSON from a PNG's text chunks. Returns None if absent."""
-    chunks = _read_png_text_chunks(file_path, {"prompt"})
-    txt = chunks.get("prompt")
-    if txt:
-        try:
-            return json.loads(txt)
-        except json.JSONDecodeError:
-            pass
-    return None
-
 
 def _is_wire(v) -> bool:
     """A node-reference wire: [str_node_id, int_slot]. Skip these — they carry no value."""
