@@ -141,8 +141,7 @@ The overlay is fixed to the canvas corner — unaffected by zoom or pan.
 
 | File | Role |
 |------|------|
-| `mbq_viewer.py` | Main window — layout, menus, zoom controls, status bulbs, copy actions |
-| `mbq_logic.py` | Navigation, metadata display, filmstrip |
+| `mbq_viewer.py` | Main window — layout, menus, navigation, metadata display, filmstrip |
 | `mbq_functions.py` | `ImageCanvas` (OpenGL view), `ImageFolder`, `WorkflowCache` |
 | `mbq_parser.py` | PNG chunk extraction, ComfyUI prompt graph parsing, three-tier node classification |
 | `comfy_nodes/mbq_wedge.py` | MBQWedge ComfyUI node |
