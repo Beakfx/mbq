@@ -1,0 +1,12 @@
+[project]
+name = "comfyui-mbqwedge"
+version = "1.0.0"
+description = "Sweep any ComfyUI numeric parameter across a range and inspect results in MBQ Viewer"
+license = { file = "LICENSE" }
+readme = "README.md"
+
+[tool.comfy]
+PublisherId = "beakfx"
+DisplayName = "MBQ Wedge"
+Icon = ""
+Tags = ["parameter sweep", "workflow", "utility"]
