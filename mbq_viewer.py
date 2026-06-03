@@ -912,7 +912,8 @@ class MBQViewerApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "mbq_icon.ico")
+    _base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    _icon_path = os.path.join(_base, "assets", "mbq_icon.ico")
     if os.path.exists(_icon_path):
         app.setWindowIcon(QIcon(_icon_path))
     window = MBQViewerApp()
