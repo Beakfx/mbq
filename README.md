@@ -1,13 +1,21 @@
 # MBQ Viewer + Wedge Node for ComfyUI
 
-![MBQ Viewer showing a Flux workflow with the metadata panel and filmstrip](assets/screenshot.png)
+I couldn't find a decent image viewer for ComfyUI outputs that showed the 
+metadata readably — so I built one. Then built a wedge/sweep node to go with it.
 
-**MBQ is a parameter sweep tool for ComfyUI, built around a tight two-part loop:**
+[![MBQ Viewer showing a Flux workflow...](assets/screenshot.png)](assets/screenshot.png)
 
-| | |
-|---|---|
-| **MBQ Wedge** | A ComfyUI custom node that sweeps any numeric parameter across a range — steps, CFG, guidance, denoise — queuing one image per value with a single click. |
-| **MBQ Viewer** | An OpenGL-accelerated desktop image viewer that reads the ComfyUI prompt data embedded in each PNG and overlays the swept parameter value directly on the canvas. |
+**MBQ Viewer** reads the prompt data embedded in every ComfyUI PNG and displays 
+it in a clean, colour-coded panel right alongside the image — models, prompts, 
+sampler params, all readable without digging into JSON. Works on any PNG saved 
+by ComfyUI's SaveImage node. ComfyUI doesn't need to be running.
+
+**MBQ Wedge** is a companion ComfyUI node that sweeps any numeric parameter 
+across a range — steps, CFG, denoise, anything — queuing one image per value 
+from a single click. Each PNG gets the swept value embedded, so the viewer 
+labels every image automatically. Lock your zoom to a crop and flip through 
+the whole sweep at pixel level.
+
 
 **The loop:** get a result you like in ComfyUI → freeze the seed → add MBQ Wedge and sweep the parameter you're uncertain about → open the output folder in MBQ Viewer → flip through results with the swept value labelled on every image, zoomed in to the exact detail you care about.
 
