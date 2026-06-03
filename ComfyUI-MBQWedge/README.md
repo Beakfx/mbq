@@ -5,7 +5,7 @@ image per value — analogous to a photographic wedge or exposure bracket.
 
 ## Install (local / Phase 1)
 
-Copy or symlink this `comfy_nodes/` folder into your ComfyUI custom nodes directory:
+Copy or symlink this `ComfyUI-MBQWedge/` folder into your ComfyUI custom nodes directory:
 
 ```
 ComfyUI/custom_nodes/ComfyUI-MBQWedge/

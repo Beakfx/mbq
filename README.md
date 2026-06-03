@@ -19,7 +19,7 @@ Say you like a scene but aren't sure how many steps you need: sweep `steps` 4 �
 
 ### Install
 
-Copy (or symlink) the `comfy_nodes/` folder into your ComfyUI custom nodes directory, renaming it `ComfyUI-MBQWedge`, then restart ComfyUI:
+Copy (or symlink) the `ComfyUI-MBQWedge/` folder into your ComfyUI custom nodes directory and restart ComfyUI:
 
 ```
 ComfyUI/custom_nodes/ComfyUI-MBQWedge/
@@ -144,8 +144,8 @@ The overlay is fixed to the canvas corner — unaffected by zoom or pan.
 | `mbq_viewer.py` | Main window — layout, menus, navigation, metadata display, filmstrip |
 | `mbq_functions.py` | `ImageCanvas` (OpenGL view), `ImageFolder`, `WorkflowCache` |
 | `mbq_parser.py` | PNG chunk extraction, ComfyUI prompt graph parsing, three-tier node classification |
-| `comfy_nodes/mbq_wedge.py` | MBQWedge ComfyUI node |
-| `comfy_nodes/js/mbq_wedge.js` | JS extension: widgets, queue intercept, seed handling |
+| `ComfyUI-MBQWedge/mbq_wedge.py` | MBQWedge ComfyUI node |
+| `ComfyUI-MBQWedge/js/mbq_wedge.js` | JS extension: widgets, queue intercept, seed handling |
 
 ---
 
