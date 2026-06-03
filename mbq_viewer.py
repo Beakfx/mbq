@@ -6,13 +6,16 @@ import sys
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QTextEdit, QMessageBox, QFileDialog,
+    QTextEdit, QMessageBox, QFileDialog, QScrollArea,
 )
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QPixmap, QPainter, QDrag
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QPixmap, QPainter, QDrag, QColor, QIcon, QShortcut
 from PySide6.QtCore import Qt, QTimer, QEvent, QUrl, QMimeData
 from mbq_functions import ImageCanvas, ImageFolder, WorkflowCache
 from mbq_parser import get_png_metadata
 
+
+_THUMB_SIZE    = 80   # filmstrip thumbnail size in px
+_FILMSTRIP_MAX = 500  # max image thumbnails to load
 
 # --- display colours ---
 C_NODE_HEADER = "#7ec8e3"   # node class name — muted cyan
@@ -66,6 +69,31 @@ def _is_preview_save(filename: str, saveimage_prefixes: list) -> bool:
     return True
 
 
+def _make_folder_pixmap(name: str, size: int) -> QPixmap:
+    pix = QPixmap(size, size)
+    pix.fill(Qt.black)
+    p = QPainter(pix)
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor("#c8823a"))
+    tab_w  = size // 3
+    tab_h  = size // 10
+    body_y = size // 4
+    body_h = size // 2
+    p.drawRoundedRect(0, body_y, size, body_h, 3, 3)
+    p.drawRoundedRect(0, body_y - tab_h, tab_w, tab_h + 4, 2, 2)
+    p.setPen(QColor("#dddddd"))
+    font = p.font()
+    font.setPointSize(max(9, size // 7))
+    p.setFont(font)
+    label = name[:12] + ("…" if len(name) > 12 else "")
+    text_y = body_y + body_h + 2
+    text_h = size - text_y - 2
+    p.drawText(0, text_y, size, text_h,
+               Qt.AlignHCenter | Qt.AlignTop | Qt.TextWordWrap, label)
+    p.end()
+    return pix
+
+
 class StatusBulb(QLabel):
     _COLORS = {"on": "#44cc44", "warn": "#c8823a", "off": "#2a2a2a"}
 
@@ -99,6 +127,7 @@ class MBQViewerApp(QMainWindow):
         self.folder_model = None
         self.image_cache = {}
         self.thumb_cache = {}
+        self._thumb_labels: list[QLabel] = []
 
         self._wedge_corner = "bottom_left"
 
@@ -161,24 +190,45 @@ class MBQViewerApp(QMainWindow):
         sep.setStyleSheet("color: #252222;")
         filmstrip_layout.addWidget(sep)
 
-        self.thumb_area = QFrame()
-        self.thumb_area.setMinimumHeight(100)
-        self.thumb_area.setStyleSheet("QFrame { border: 1px solid #333; border-radius: 2px; }")
-        self.thumb_layout = QHBoxLayout(self.thumb_area)
-        self.thumb_layout.setContentsMargins(0, 0, 0, 0)
-        filmstrip_layout.addWidget(self.thumb_area)
+        self.filmstrip_scroll = QScrollArea()
+        self.filmstrip_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.filmstrip_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.filmstrip_scroll.setWidgetResizable(False)
+        self.filmstrip_scroll.setFrameShape(QFrame.NoFrame)
+        self.filmstrip_scroll.setStyleSheet(
+            "QScrollArea { border: 1px solid #333; border-radius: 2px; }"
+        )
+        self.filmstrip_scroll.setMinimumHeight(_THUMB_SIZE + 24)
+
+        self._filmstrip_inner = QWidget()
+        self._filmstrip_inner.setFixedHeight(_THUMB_SIZE + 4)
+        self.thumb_layout = QHBoxLayout(self._filmstrip_inner)
+        self.thumb_layout.setContentsMargins(2, 2, 2, 2)
+        self.thumb_layout.setSpacing(2)
+        self.filmstrip_scroll.setWidget(self._filmstrip_inner)
+        filmstrip_layout.addWidget(self.filmstrip_scroll)
 
         center_layout.addWidget(self.filmstrip_frame, 1, 0)
+
+        # ---- Path Label ----
+        self.path_label = QLabel("")
+        self.path_label.setStyleSheet(
+            "color: #888; font-size: 11px; font-family: 'Courier New'; padding: 1px 4px;"
+        )
+        self.path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        center_layout.addWidget(self.path_label, 2, 0)
 
         # ---- Button Frame ----
         self.button_frame = QFrame()
         btn_layout = QHBoxLayout(self.button_frame)
         btn_layout.setContentsMargins(0, 2, 0, 2)
 
-        next_btn = QPushButton("Next Image  ▶")
-        prev_btn = QPushButton("◀  Previous Image")
+        up_btn   = QPushButton("↑ Up")
         open_btn = QPushButton("Open Image ")
+        prev_btn = QPushButton("◀  Previous")
+        next_btn = QPushButton("Next  ▶")
 
+        btn_layout.addWidget(up_btn)
         btn_layout.addWidget(open_btn)
         btn_layout.addWidget(prev_btn)
         btn_layout.addWidget(next_btn)
@@ -209,7 +259,7 @@ class MBQViewerApp(QMainWindow):
         btn_layout.addLayout(_bulb_group(self.bulb_scroll,  "Scroll (S)"))
         btn_layout.addLayout(_bulb_group(self.bulb_uncomfy, "UnComfy"))
 
-        center_layout.addWidget(self.button_frame, 2, 0)
+        center_layout.addWidget(self.button_frame, 3, 0)
 
         # --- Right Workflow Panel ---
         self.right_metadata = QGroupBox("Workflow")
@@ -348,7 +398,7 @@ class MBQViewerApp(QMainWindow):
         ]:
             act = QAction(_label, self, checkable=True)
             act.setChecked(_key == "bottom_left")
-            act.triggered.connect(lambda checked, k=_key: setattr(self, "_wedge_corner", k))
+            act.triggered.connect(lambda checked, k=_key: self._set_wedge_corner(k))
             overlay_group.addAction(act)
             overlay_menu.addAction(act)
 
@@ -357,6 +407,7 @@ class MBQViewerApp(QMainWindow):
         about_menu.addAction("Help", self._open_help)
 
         # ---- Connect Signals ----
+        up_btn.clicked.connect(self.navigate_up)
         open_btn.clicked.connect(self.open_image_file)
         next_btn.clicked.connect(self.show_next_image)
         prev_btn.clicked.connect(self.show_prev_image)
@@ -365,6 +416,13 @@ class MBQViewerApp(QMainWindow):
 
         self.installEventFilter(self)
 
+        _sc_next = QShortcut(Qt.Key_Right, self)
+        _sc_next.activated.connect(self.show_next_image)
+        _sc_prev = QShortcut(Qt.Key_Left, self)
+        _sc_prev.activated.connect(self.show_prev_image)
+
+        self.filmstrip_scroll.setFocusPolicy(Qt.NoFocus)
+
         zoom_timer = QTimer(self)
         zoom_timer.timeout.connect(self._update_zoom_readout)
         zoom_timer.start(150)
@@ -372,40 +430,36 @@ class MBQViewerApp(QMainWindow):
     # ---- Navigation ----
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Right:
-            self.show_next_image()
-            event.accept()
-        elif event.key() == Qt.Key_Left:
-            self.show_prev_image()
-            event.accept()
-        else:
-            super().keyPressEvent(event)
+        super().keyPressEvent(event)
 
     def show_next_image(self):
         if self.folder_model:
+            prev_idx = self.folder_model.index
             current = self.folder_model.next()
             if current:
                 self.display_image(current["path"])
                 self.update_metadata(current)
-                self.populate_filmstrip()
+                self._scroll_to_current(prev_idx)
                 self.preload_adjacent_images()
 
     def show_prev_image(self):
         if self.folder_model:
+            prev_idx = self.folder_model.index
             current = self.folder_model.prev()
             if current:
                 self.display_image(current["path"])
                 self.update_metadata(current)
-                self.populate_filmstrip()
+                self._scroll_to_current(prev_idx)
                 self.preload_adjacent_images()
 
     def jump_to_index(self, idx):
+        prev_idx = self.folder_model.index if self.folder_model else None
         self.folder_model.index = idx
         current = self.folder_model.current()
         if current:
             self.display_image(current["path"])
             self.update_metadata(current)
-            self.populate_filmstrip()
+            self._scroll_to_current(prev_idx)
             self.preload_adjacent_images()
 
     def display_image(self, path):
@@ -454,12 +508,15 @@ class MBQViewerApp(QMainWindow):
         self.folder_model = ImageFolder(folder_path)
         self.image_cache.clear()
         self.thumb_cache.clear()
-        current = self.folder_model.current()
-        if current:
+        if self.folder_model.files:
+            current = self.folder_model.current()
             self.display_image(current["path"])
             self.update_metadata(current)
+        else:
+            self._show_empty_folder()
         self.populate_filmstrip()
         self.preload_adjacent_images()
+        self._update_path_label()
 
     def load_image_from_path(self, file_path):
         folder = os.path.dirname(file_path)
@@ -472,6 +529,7 @@ class MBQViewerApp(QMainWindow):
             self.update_metadata(current)
         self.populate_filmstrip()
         self.preload_adjacent_images()
+        self._update_path_label()
 
     def refresh_folder(self):
         if not self.folder_model:
@@ -490,12 +548,34 @@ class MBQViewerApp(QMainWindow):
         self.image_cache.clear()
         self.thumb_cache.clear()
         self.workflow_cache.clear()
-        current = self.folder_model.current()
-        if current:
+        if self.folder_model.files:
+            current = self.folder_model.current()
             self.display_image(current["path"])
             self.update_metadata(current)
+        else:
+            self._show_empty_folder()
         self.populate_filmstrip()
         self.preload_adjacent_images()
+        self._update_path_label()
+
+    def navigate_up(self):
+        if not self.folder_model:
+            return
+        parent = self.folder_model.folder_path.parent
+        if parent != self.folder_model.folder_path:
+            self.load_folder_from_path(str(parent))
+
+    def _update_path_label(self):
+        self.path_label.setText(
+            str(self.folder_model.folder_path) if self.folder_model else ""
+        )
+
+    def _show_empty_folder(self):
+        size = min(self.image_view.viewport().width(),
+                   self.image_view.viewport().height()) // 2
+        size = max(size, 120)
+        pix = _make_folder_pixmap(self.folder_model.folder_path.name, size)
+        self.image_view.load_image_from_pixmap(pix)
 
     # ---- Metadata display ----
 
@@ -610,52 +690,56 @@ class MBQViewerApp(QMainWindow):
             item = self.thumb_layout.takeAt(i)
             if widget := item.widget():
                 widget.deleteLater()
+        self._thumb_labels = []
 
         if not self.folder_model:
             return
 
-        filmstrip_height = self.thumb_area.height()
-        thumb_size = filmstrip_height - 20
-        available_width = self.thumb_area.width()
-        max_thumbs = max(5, available_width // thumb_size)
+        # folder entries — all subdirs, no cap
+        for subdir in (self.folder_model.subdirs or []):
+            pix = _make_folder_pixmap(subdir.name, _THUMB_SIZE)
+            lbl = QLabel()
+            lbl.setPixmap(pix)
+            lbl.setFixedSize(_THUMB_SIZE, _THUMB_SIZE)
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet("border: 1px solid #555;")
+            lbl.setCursor(Qt.PointingHandCursor)
+            lbl.setToolTip(subdir.name)
+            path_str = str(subdir)
+            lbl.mousePressEvent = lambda e, p=path_str: (
+                self.load_folder_from_path(p) if e.button() == Qt.LeftButton else None
+            )
+            self.thumb_layout.addWidget(lbl)
 
+        # image entries — linear, capped at _FILMSTRIP_MAX
         center_index = self.folder_model.index
-        files = self.folder_model.files
-        if not files:
-            return
-
-        num_files = len(files)
-        if num_files <= max_thumbs:
-            indices = list(range(num_files))
-        else:
-            half_thumbs = max_thumbs // 2
-            start_idx = center_index - half_thumbs
-            end_idx = center_index + half_thumbs + (1 if max_thumbs % 2 else 0)
-            indices = [idx % num_files for idx in range(start_idx, end_idx)]
-
-        for actual_idx in indices:
-            file_path = files[actual_idx]["path"]
-
-            cache_key = (file_path, thumb_size)
+        for actual_idx, file_info in enumerate(self.folder_model.files[:_FILMSTRIP_MAX]):
+            file_path = file_info["path"]
+            cache_key = (file_path, _THUMB_SIZE)
             if cache_key not in self.thumb_cache:
                 pix = QPixmap(file_path).scaled(
-                    thumb_size, thumb_size,
-                    Qt.KeepAspectRatio,
-                    Qt.SmoothTransformation,
+                    _THUMB_SIZE, _THUMB_SIZE,
+                    Qt.KeepAspectRatio, Qt.SmoothTransformation,
                 )
-                final_pix = QPixmap(thumb_size, thumb_size)
+                final_pix = QPixmap(_THUMB_SIZE, _THUMB_SIZE)
                 final_pix.fill(Qt.black)
                 painter = QPainter(final_pix)
-                painter.drawPixmap((thumb_size - pix.width()) // 2, (thumb_size - pix.height()) // 2, pix)
+                painter.drawPixmap(
+                    (_THUMB_SIZE - pix.width()) // 2,
+                    (_THUMB_SIZE - pix.height()) // 2, pix
+                )
                 painter.end()
                 self.thumb_cache[cache_key] = final_pix
-            final_pix = self.thumb_cache[cache_key]
 
             lbl = QLabel()
-            lbl.setPixmap(final_pix)
+            lbl.setPixmap(self.thumb_cache[cache_key])
+            lbl.setFixedSize(_THUMB_SIZE, _THUMB_SIZE)
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setFixedSize(thumb_size, thumb_size)
-            lbl.setStyleSheet("border: 2px solid #22aa33;" if actual_idx == center_index else "border: 1px solid #444;")
+            lbl.setStyleSheet(
+                "border: 2px solid #22aa33;"
+                if actual_idx == center_index else
+                "border: 1px solid #444;"
+            )
             lbl.setCursor(Qt.PointingHandCursor)
 
             def _press(e, w=lbl):
@@ -688,6 +772,27 @@ class MBQViewerApp(QMainWindow):
             lbl.mouseMoveEvent    = _move
             lbl.mouseReleaseEvent = _release
             self.thumb_layout.addWidget(lbl)
+            self._thumb_labels.append(lbl)
+
+        n = self.thumb_layout.count()
+        total_w = 4 + n * _THUMB_SIZE + max(0, n - 1) * 2  # margins=4, spacing=2
+        self._filmstrip_inner.resize(total_w, _THUMB_SIZE + 4)
+        self._scroll_to_current()
+
+    def _scroll_to_current(self, prev_idx=None):
+        if prev_idx is not None and 0 <= prev_idx < len(self._thumb_labels):
+            self._thumb_labels[prev_idx].setStyleSheet("border: 1px solid #444;")
+        idx = self.folder_model.index if self.folder_model else -1
+        if 0 <= idx < len(self._thumb_labels):
+            lbl = self._thumb_labels[idx]
+            lbl.setStyleSheet("border: 2px solid #22aa33;")
+            QTimer.singleShot(0, lambda: self._center_on_label(lbl))
+
+    def _center_on_label(self, lbl):
+        sb = self.filmstrip_scroll.horizontalScrollBar()
+        lbl_center = lbl.x() + lbl.width() // 2
+        viewport_half = self.filmstrip_scroll.viewport().width() // 2
+        sb.setValue(lbl_center - viewport_half)
 
     # ---- Zoom / view ----
 
@@ -708,6 +813,11 @@ class MBQViewerApp(QMainWindow):
         self._lock_zoom_action.setChecked(False)
         self._fit_lock_action.setChecked(False)
         self.image_view.reset_zoom()
+
+    def _set_wedge_corner(self, key):
+        self._wedge_corner = key
+        self.image_view._wedge_corner = key
+        self.image_view._reposition_overlay()
 
     def _update_zoom_readout(self):
         pct = self.image_view.transform().m11() * 100
@@ -792,10 +902,6 @@ class MBQViewerApp(QMainWindow):
                     obj.verticalScrollBar().value() - event.angleDelta().y() // 4
                 )
                 return True
-        if event.type() == QEvent.KeyPress:
-            if event.key() in (Qt.Key_Right, Qt.Key_Left):
-                self.keyPressEvent(event)
-                return True
         return super().eventFilter(obj, event)
 
     # ---- Cache ----
@@ -806,6 +912,9 @@ class MBQViewerApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "mbq_icon.ico")
+    if os.path.exists(_icon_path):
+        app.setWindowIcon(QIcon(_icon_path))
     window = MBQViewerApp()
     window.show()
     if len(sys.argv) > 1:

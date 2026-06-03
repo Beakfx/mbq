@@ -8,5 +8,5 @@ readme = "README.md"
 [tool.comfy]
 PublisherId = "beakfx"
 DisplayName = "MBQ Wedge"
-Icon = ""
-Tags = ["parameter sweep", "workflow", "utility"]
+Icon = "assets/mbq_icon.png"
+Tags = ["parameter wedge", "sweep", "workflow", "utility"]

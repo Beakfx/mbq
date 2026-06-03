@@ -24,6 +24,7 @@ class ImageFolder:
         """
         self.folder_path = Path(folder_path)
         self.files = []
+        self.subdirs = []
         self.index = 0
 
         self.scan_folder()
@@ -39,6 +40,7 @@ class ImageFolder:
         """Populate self.files with image metadata"""
         if not self.folder_path.exists():
             self.files = []
+            self.subdirs = []
             return
 
         all_files = [
@@ -73,6 +75,11 @@ class ImageFolder:
 
             self.files.append(file_info)
 
+        self.subdirs = sorted(
+            [d for d in self.folder_path.iterdir()
+             if d.is_dir() and not d.name.startswith('.')],
+            key=lambda d: d.name.lower()
+        )
         self.index = 0
 
     def current(self):
