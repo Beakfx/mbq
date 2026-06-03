@@ -64,6 +64,14 @@ Wire `int_value` → BasicScheduler `steps`. Click Queue → 9 jobs, 9 PNGs, eac
 
 ### Install
 
+**Option A — standalone exe (Windows)**
+
+Download `MBQViewer.exe` from the **[Releases page](https://github.com/Beakfx/mbq/releases/latest)**. No install, no Python required — just run it.
+
+> **Windows SmartScreen:** MBQ Viewer is not yet code-signed, so Windows will show a "Windows protected your PC" dialog on first launch. Click **More info → Run anyway**. This is normal for unsigned indie software.
+
+**Option B — run from source (Windows / Linux / Mac)**
+
 **Requirements:** Python 3.11+, PySide6
 
 ```bash
