@@ -1,3 +1,5 @@
+__version__ = "0.9.2"
+
 import html as _html
 import os
 import re
@@ -119,7 +121,7 @@ class StatusBulb(QLabel):
 class MBQViewerApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("MBQ Viewer")
+        self.setWindowTitle(f"MBQ Viewer v{__version__}")
         self.workflow_cache = WorkflowCache(max_size=50)
 
         self.resize(1400, 900)
