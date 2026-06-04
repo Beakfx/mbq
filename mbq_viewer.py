@@ -6,7 +6,7 @@ import sys
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QGroupBox,
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QTextEdit, QMessageBox, QFileDialog, QScrollArea,
+    QTextEdit, QMessageBox, QFileDialog, QScrollArea, QLineEdit,
 )
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QPixmap, QPainter, QDrag, QColor, QIcon, QShortcut
 from PySide6.QtCore import Qt, QTimer, QEvent, QUrl, QMimeData
@@ -313,6 +313,23 @@ class MBQViewerApp(QMainWindow):
         sep.setFrameShape(QFrame.HLine)
         sep.setStyleSheet("color: #333;")
         metadata_vbox.addWidget(sep)
+
+        search_row = QHBoxLayout()
+        search_row.setSpacing(4)
+        search_lbl = QLabel("⌕")
+        search_lbl.setStyleSheet("color: #888; font-size: 14px;")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search workflow…")
+        self.search_input.setStyleSheet(
+            "QLineEdit { background: #1a1a1a; color: #ddd; border: 1px solid #444;"
+            " border-radius: 3px; padding: 2px 6px; font-size: 9pt; }"
+            "QLineEdit:focus { border-color: #666; }"
+        )
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.textChanged.connect(self._search_workflow)
+        search_row.addWidget(search_lbl)
+        search_row.addWidget(self.search_input)
+        metadata_vbox.addLayout(search_row)
 
         mono_style = "font-family: 'Courier New', 'Consolas', monospace; font-size: 9pt;"
         self.primary_display = QTextEdit()
@@ -669,6 +686,9 @@ class MBQViewerApp(QMainWindow):
             self.bulb_wedge.set_state("off")
             self.copy_prompt_btn.setEnabled(False)
 
+        if self.search_input.text():
+            QTimer.singleShot(0, lambda: self._search_workflow(self.search_input.text()))
+
         if wedge and wedge_val is not None:
             val_str = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
             overlay_text = f"{wedge['parameter_name']}: {val_str}"
@@ -682,6 +702,31 @@ class MBQViewerApp(QMainWindow):
         n = getattr(self, "_tier3_count", 0)
         arrow = "▼" if visible else "▶"
         self.tier3_btn.setText(f'<span style="font-size:18px;">{arrow}</span> plumbing ({n} nodes)')
+
+    def _search_workflow(self, text: str):
+        from PySide6.QtGui import QTextCharFormat, QTextDocument, QTextCursor
+        highlight_fmt = QTextCharFormat()
+        highlight_fmt.setBackground(QColor("#00aa44"))
+        highlight_fmt.setForeground(QColor("#000000"))
+        freeze = getattr(self._freeze_scroll_action, 'isChecked', lambda: False)()
+        for display in (self.primary_display, self.tier3_display):
+            if not text:
+                display.setExtraSelections([])
+                continue
+            selections = []
+            doc = display.document()
+            cursor = doc.find(text, 0, QTextDocument.FindFlag(0))
+            while not cursor.isNull():
+                sel = QTextEdit.ExtraSelection()
+                sel.cursor = cursor
+                sel.format = highlight_fmt
+                selections.append(sel)
+                cursor = doc.find(text, cursor)
+            display.setExtraSelections(selections)
+            if selections and not freeze and display is self.primary_display:
+                jump = QTextCursor(selections[0].cursor)
+                jump.clearSelection()
+                display.setTextCursor(jump)
 
     # ---- Filmstrip ----
 
