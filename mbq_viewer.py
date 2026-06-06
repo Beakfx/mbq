@@ -1,4 +1,4 @@
-__version__ = "0.9.2"
+__version__ = "0.9.3"
 
 import html as _html
 import os
@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QTextEdit, QMessageBox, QFileDialog, QScrollArea, QLineEdit,
 )
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QPixmap, QPainter, QDrag, QColor, QIcon, QShortcut
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QPixmap, QPainter, QDrag, QColor, QIcon, QShortcut, QPalette
 from PySide6.QtCore import Qt, QTimer, QEvent, QUrl, QMimeData
 from mbq_functions import ImageCanvas, ImageFolder, WorkflowCache
 from mbq_parser import get_png_metadata
@@ -959,6 +959,20 @@ class MBQViewerApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    _p = QPalette()
+    _p.setColor(QPalette.ColorRole.Window,          QColor(30, 30, 30))
+    _p.setColor(QPalette.ColorRole.WindowText,      QColor(220, 220, 220))
+    _p.setColor(QPalette.ColorRole.Base,            QColor(25, 25, 25))
+    _p.setColor(QPalette.ColorRole.AlternateBase,   QColor(30, 30, 30))
+    _p.setColor(QPalette.ColorRole.ToolTipBase,     QColor(25, 25, 25))
+    _p.setColor(QPalette.ColorRole.ToolTipText,     QColor(220, 220, 220))
+    _p.setColor(QPalette.ColorRole.Text,            QColor(220, 220, 220))
+    _p.setColor(QPalette.ColorRole.Button,          QColor(40, 40, 40))
+    _p.setColor(QPalette.ColorRole.ButtonText,      QColor(220, 220, 220))
+    _p.setColor(QPalette.ColorRole.Highlight,       QColor(42, 130, 218))
+    _p.setColor(QPalette.ColorRole.HighlightedText, QColor(0, 0, 0))
+    app.setPalette(_p)
     _base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     _icon_path = os.path.join(_base, "assets", "mbq_icon.ico")
     if os.path.exists(_icon_path):
