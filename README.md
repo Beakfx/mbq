@@ -80,10 +80,10 @@ Download `MBQViewer.exe` from the **[Releases page](https://github.com/Beakfx/mb
 
 **Option B — run from source (Windows / Linux / Mac)**
 
-**Requirements:** Python 3.11+, PySide6
+**Requirements:** Python 3.11+, PySide6, send2trash
 
 ```bash
-pip install pyside6
+pip install pyside6 send2trash
 python mbq_viewer.py
 ```
 
