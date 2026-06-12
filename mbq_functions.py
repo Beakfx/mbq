@@ -99,6 +99,17 @@ class ImageFolder:
         self.index = (self.index - 1) % len(self.files)
         return self.current()
 
+    def remove(self, path: str):
+        try:
+            idx = [f["path"] for f in self.files].index(path)
+        except ValueError:
+            return
+        self.files.pop(idx)
+        if self.files:
+            self.index = min(idx, len(self.files) - 1)
+        else:
+            self.index = 0
+
 
 
 

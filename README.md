@@ -126,18 +126,30 @@ When a swept image is loaded, MBQ Viewer:
 
 The overlay is fixed to the canvas corner — unaffected by zoom or pan.
 
+### Culling images
+
+Press `Delete` (or the **Delete** button in the toolbar) to move the current image to the OS trash — Recycle Bin on Windows, Trash on macOS, XDG trash on Linux. The viewer advances to the next image automatically.
+
+Press `Ctrl+Z` (or **Edit → Restore Deleted**) to restore the last deleted image from trash. Multiple undo levels are supported within the same folder session. If you switch folders and then undo, the file is still restored on disk — navigate back to that folder to find it.
+
+> **Network shares:** if the file is on a network share or filesystem that doesn't support trash, MBQ Viewer will ask before permanently deleting. Undo is not available for permanent deletes.
+
 ### Keyboard shortcuts
 
 | Key | Action |
 |-----|--------|
 | `Ctrl+O` | Open image |
 | `← / →` | Previous / next image |
+| `Delete` | Move current image to Recycle Bin / Trash |
+| `Ctrl+Z` | Restore last deleted image |
 | `F5` | Refresh folder |
 | `Z` | Toggle zoom lock |
 | `F` | Toggle fit lock |
 | `R` | Reset zoom to 100%, clear locks |
 | `S` | Toggle scroll freeze |
 | `Ctrl+Q` | Quit |
+
+The **Search** box above the workflow panel highlights all matching text across the workflow panel. The search term persists when flipping between images — useful for comparing the same parameter across a sweep. Scroll Freeze is respected: if active, the panel won't jump to the first match.
 
 ---
 

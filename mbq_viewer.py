@@ -1,6 +1,7 @@
-__version__ = "0.9.3"
+__version__ = "0.9.4"
 
 import html as _html
+import send2trash
 import os
 import re
 import sys
@@ -10,7 +11,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QTextEdit, QMessageBox, QFileDialog, QScrollArea, QLineEdit,
 )
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QPixmap, QPainter, QDrag, QColor, QIcon, QShortcut, QPalette
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QPixmap, QPainter, QDrag, QColor, QIcon, QShortcut, QPalette, QKeySequence
 from PySide6.QtCore import Qt, QTimer, QEvent, QUrl, QMimeData
 from mbq_functions import ImageCanvas, ImageFolder, WorkflowCache
 from mbq_parser import get_png_metadata
@@ -129,6 +130,7 @@ class MBQViewerApp(QMainWindow):
         self.folder_model = None
         self.image_cache = {}
         self.thumb_cache = {}
+        self._undo_stack: list[str] = []
         self._thumb_labels: list[QLabel] = []
 
         self._wedge_corner = "bottom_left"
@@ -234,6 +236,15 @@ class MBQViewerApp(QMainWindow):
         btn_layout.addWidget(open_btn)
         btn_layout.addWidget(prev_btn)
         btn_layout.addWidget(next_btn)
+        btn_layout.addSpacing(18)
+        self.del_btn = QPushButton("Delete <Del>")
+        self.del_btn.setStyleSheet(
+            "QPushButton { color: #e06060; border: 1px solid #7a3333; padding: 2px 10px; }"
+            "QPushButton:hover { background: #3a1a1a; color: #ff8080; }"
+            "QPushButton:pressed { background: #4a2020; }"
+        )
+        self.del_btn.clicked.connect(self.delete_current_image)
+        btn_layout.addWidget(self.del_btn)
 
         # ---- Status Bulbs ----
         btn_layout.addStretch()
@@ -385,6 +396,8 @@ class MBQViewerApp(QMainWindow):
         edit_menu.addAction("Copy Image", self._copy_image)
         edit_menu.addAction("Copy Summary", self._copy_workflow)
         edit_menu.addAction("Copy Workflow", self._copy_prompt_json)
+        edit_menu.addSeparator()
+        self._restore_action = edit_menu.addAction("Restore Deleted\tCtrl+Z", self.undo_delete)
 
         view_menu = menu_bar.addMenu("View")
         refresh_action = QAction("Refresh", self, shortcut="F5")
@@ -439,6 +452,8 @@ class MBQViewerApp(QMainWindow):
         _sc_next.activated.connect(self.show_next_image)
         _sc_prev = QShortcut(Qt.Key_Left, self)
         _sc_prev.activated.connect(self.show_prev_image)
+        QShortcut(Qt.Key_Delete, self).activated.connect(self.delete_current_image)
+        QShortcut(QKeySequence("Ctrl+Z"), self).activated.connect(self.undo_delete)
 
         self.filmstrip_scroll.setFocusPolicy(Qt.NoFocus)
 
@@ -704,6 +719,165 @@ class MBQViewerApp(QMainWindow):
         n = getattr(self, "_tier3_count", 0)
         arrow = "▼" if visible else "▶"
         self.tier3_btn.setText(f'<span style="font-size:18px;">{arrow}</span> plumbing ({n} nodes)')
+
+    def delete_current_image(self):
+        if not self.folder_model or not self.folder_model.files:
+            return
+        file_info = self.folder_model.current()
+        if not file_info:
+            return
+        path = file_info["path"]
+        try:
+            send2trash.send2trash(path)
+            can_undo = True
+        except send2trash.TrashPermissionError:
+            reply = QMessageBox.warning(
+                self, "Cannot move to trash",
+                f"This file is on a network share or a filesystem that doesn't support trash.\n\n"
+                f"{file_info['name']}\n\n"
+                "Delete permanently? This cannot be undone.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                os.remove(path)
+            except Exception as e:
+                QMessageBox.warning(self, "Delete failed", str(e))
+                return
+            can_undo = False
+        except Exception as e:
+            QMessageBox.warning(self, "Delete failed", str(e))
+            return
+        if can_undo:
+            self._undo_stack.append(path)
+        for key in [k for k in self.thumb_cache if k[0] == path]:
+            del self.thumb_cache[key]
+        self.folder_model.remove(path)
+        if self.folder_model.files:
+            current = self.folder_model.current()
+            self.display_image(current["path"])
+            self.update_metadata(current)
+            self.populate_filmstrip()
+        else:
+            self._show_empty_folder()
+
+    def undo_delete(self):
+        if not self._undo_stack:
+            return
+        path = self._undo_stack[-1]
+        try:
+            self._restore_from_trash(path)
+        except Exception as e:
+            QMessageBox.information(
+                self, "Undo",
+                f"Could not restore automatically:\n{e}\n\n"
+                f"File is in your Recycle Bin / Trash.\nOriginal location: {path}"
+            )
+            return
+        self._undo_stack.pop()
+        if self.folder_model:
+            current_path = (self.folder_model.current() or {}).get("path")
+            self.folder_model.scan_folder()
+            if current_path:
+                try:
+                    self.folder_model.index = [f["path"] for f in self.folder_model.files].index(current_path)
+                except ValueError:
+                    pass
+            try:
+                idx = [f["path"] for f in self.folder_model.files].index(path)
+                self.folder_model.index = idx
+                current = self.folder_model.current()
+                self.display_image(current["path"])
+                self.update_metadata(current)
+                self.populate_filmstrip()
+            except ValueError:
+                pass
+
+    def _restore_from_trash(self, original_path: str):
+        import shutil
+        if sys.platform == "win32":
+            import struct
+            drive = os.path.splitdrive(original_path)[0] + "\\"
+            recycle_root = os.path.join(drive, "$Recycle.Bin")
+            if not os.path.exists(recycle_root):
+                raise FileNotFoundError("Recycle Bin not found")
+            for sid_entry in os.scandir(recycle_root):
+                if not sid_entry.is_dir():
+                    continue
+                try:
+                    for entry in os.scandir(sid_entry.path):
+                        if not entry.name.upper().startswith("$I"):
+                            continue
+                        try:
+                            with open(entry.path, "rb") as f:
+                                data = f.read()
+                            if len(data) < 24:
+                                continue
+                            version = struct.unpack_from("<q", data, 0)[0]
+                            if version == 2:
+                                path_len = struct.unpack_from("<i", data, 24)[0]
+                                stored = data[28:28 + path_len * 2].decode("utf-16-le").rstrip("\x00")
+                            else:
+                                stored = data[24:].decode("utf-16-le").rstrip("\x00")
+                            if stored.lower() == original_path.lower():
+                                r_name = "$R" + entry.name[2:]
+                                r_path = os.path.join(sid_entry.path, r_name)
+                                if os.path.exists(r_path):
+                                    shutil.move(r_path, original_path)
+                                    os.remove(entry.path)
+                                    return
+                        except (OSError, UnicodeDecodeError, struct.error):
+                            continue
+                except OSError:
+                    continue
+            raise RuntimeError("File not found in Recycle Bin")
+        elif sys.platform == "darwin":
+            trash = os.path.expanduser("~/.Trash")
+            name = os.path.basename(original_path)
+            src = os.path.join(trash, name)
+            if not os.path.exists(src):
+                raise FileNotFoundError(f"{name} not found in Trash")
+            shutil.move(src, original_path)
+        else:
+            import glob, urllib.parse, configparser
+            uid = os.getuid()
+
+            def _try_xdg_dir(trash_dir):
+                for info_file in glob.glob(os.path.join(trash_dir, "info", "*.trashinfo")):
+                    cp = configparser.ConfigParser()
+                    cp.read(info_file)
+                    stored = cp.get("Trash Info", "Path", fallback="")
+                    if urllib.parse.unquote(stored) in (original_path, os.path.basename(original_path)):
+                        base = os.path.splitext(os.path.basename(info_file))[0]
+                        src = os.path.join(trash_dir, "files", base)
+                        if os.path.exists(src):
+                            shutil.move(src, original_path)
+                            os.remove(info_file)
+                            return True
+                return False
+
+            if _try_xdg_dir(os.path.expanduser("~/.local/share/Trash")):
+                return
+            parent_dev = os.stat(os.path.dirname(original_path)).st_dev
+            with open("/proc/mounts") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) < 2:
+                        continue
+                    mount = parts[1]
+                    try:
+                        if os.stat(mount).st_dev == parent_dev:
+                            for candidate in (
+                                os.path.join(mount, f".Trash-{uid}"),
+                                os.path.join(mount, ".Trash", str(uid)),
+                            ):
+                                if os.path.isdir(candidate) and _try_xdg_dir(candidate):
+                                    return
+                    except OSError:
+                        continue
+            raise FileNotFoundError(f"{os.path.basename(original_path)} not found in any trash location")
 
     def _search_workflow(self, text: str):
         from PySide6.QtGui import QTextCharFormat, QTextDocument, QTextCursor
