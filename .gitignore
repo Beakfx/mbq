@@ -13,6 +13,8 @@ ENV/
 # Build and packaging
 build/
 dist/
+installer/
+*.iss
 *.egg-info/
 *.spec
 

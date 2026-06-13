@@ -1,25 +1,22 @@
 # MBQ Viewer + Wedge Node for ComfyUI
 
-I couldn't find a decent image viewer for ComfyUI outputs that showed the 
-metadata readably — so I built one. Then built a wedge/sweep node to go with it.
+Image viewer and parameter sweep tool for ComfyUI workflows.
 
 [![MBQ Viewer showing a Flux workflow...](assets/screenshot.png)](assets/screenshot.png)
 
-**MBQ Viewer** reads the prompt data embedded in every ComfyUI PNG and displays 
-it in a clean, colour-coded panel right alongside the image — models, prompts, 
-sampler params, all readable without digging into JSON. Works on any PNG saved 
-by ComfyUI's SaveImage node. ComfyUI doesn't need to be running.
+**MBQ Viewer** is a standalone desktop app that reads the prompt data embedded in
+every ComfyUI PNG and displays it in a clean, colour-coded panel right alongside
+the image — models, prompts, sampler params, all readable without digging into JSON.
+Works on any PNG saved by ComfyUI's SaveImage node, not just MBQ Wedge outputs.
+ComfyUI doesn't need to be running.
 
-**MBQ Wedge** is a companion ComfyUI node that sweeps any numeric parameter 
-across a range — steps, CFG, denoise, anything — queuing one image per value 
-from a single click. Each PNG gets the swept value embedded, so the viewer 
-labels every image automatically. Lock your zoom to a crop and flip through 
+**MBQ Wedge** is a companion ComfyUI node that sweeps any numeric parameter
+across a range — steps, CFG, denoise, anything — queuing one image per value
+from a single click. Each PNG gets the swept value embedded, so the viewer
+labels every image automatically. Lock your zoom to a crop and flip through
 the whole sweep at pixel level.
 
-
 **The loop:** get a result you like in ComfyUI → freeze the seed → add MBQ Wedge and sweep the parameter you're uncertain about → open the output folder in MBQ Viewer → flip through results with the swept value labelled on every image, zoomed in to the exact detail you care about.
-
-Say you like a scene but aren't sure how many steps you need: sweep `steps` 4 → 12. Want to tune an inpaint blend? Sweep `denoise` 0.4 → 1.0 at 0.05 increments. Works with any float or int input on any node.
 
 ---
 
@@ -72,24 +69,27 @@ Wire `int_value` → BasicScheduler `steps`. Click Queue → 9 jobs, 9 PNGs, eac
 
 ### Install
 
-**Option A — standalone exe (Windows)**
+**Option A — Windows installer**
 
-Download `MBQViewer.exe` from the **[Releases page](https://github.com/Beakfx/mbq/releases)**. No install, no Python required — just run it.
+Download `MBQViewer-Setup-1.0.0.exe` from the **[Releases page](https://github.com/Beakfx/mbq/releases)** and run it. Installs to `Program Files\MBQ Viewer`, adds a Start Menu entry, and optionally a desktop shortcut. Uninstall via Windows Settings → Apps.
 
-> **Windows SmartScreen:** MBQ Viewer is not yet code-signed, so Windows will show a "Windows protected your PC" dialog on first launch. Click **More info → Run anyway**. This is normal for unsigned indie software.
+> **Windows SmartScreen:** MBQ Viewer is not yet code-signed, so Windows may show a "Windows protected your PC" dialog. Click **More info → Run anyway**. This is normal for unsigned indie software.
 
-**Option B — run from source (Windows / Linux / Mac)**
+**Option B — portable exe (Windows)**
 
-**Requirements:** Python 3.11+, PySide6, send2trash
+Download `MBQViewer.exe` from the **[Releases page](https://github.com/Beakfx/mbq/releases)**. No install required — just run it from anywhere. Startup is a few seconds slower than the installer version because it unpacks itself to a temp folder on each launch.
+
+> Same SmartScreen note applies.
+
+**Option C — run from source (Windows / Linux / Mac)**
+
+**Requirements:** Python 3.11+
 
 ```bash
+git clone https://github.com/Beakfx/mbq.git
+cd mbq
 pip install pyside6 send2trash
 python mbq_viewer.py
-```
-
-```bash
-python mbq_viewer.py path/to/image.png   # open image + its folder
-python mbq_viewer.py path/to/folder/     # open folder
 ```
 
 Drag images in from Explorer or ComfyUI. Drag thumbnails out to Explorer or ComfyUI.
