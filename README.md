@@ -88,7 +88,7 @@ Download `MBQViewer.exe` from the **[Releases page](https://github.com/Beakfx/mb
 ```bash
 git clone https://github.com/Beakfx/mbq.git
 cd mbq
-pip install pyside6 send2trash
+pip install -r requirements.txt
 python mbq_viewer.py
 ```
 
@@ -108,7 +108,7 @@ Reads the prompt JSON embedded by ComfyUI's SaveImage node and displays it in a 
 
 - **Tier 1** — models, prompts, sampler params (the things you usually care about)
 - **Tier 2** — other scalar values
-- **Tier 3** — plumbing nodes (collapsible, hidden by default)
+- **Tier 3** — plumbing nodes (expandable, hidden by default)
 
 Colour coding: cyan node headers · yellow keys · near-white values
 
@@ -161,7 +161,13 @@ The **Search** box above the workflow panel highlights all matching text across 
 | Zoom | Green | Zoom Lock active |
 | Fit | Teal | Fit Lock active |
 | Scroll | Green | Scroll Freeze active |
-| UnComfy | Amber | File may be a preview save, not a final output |
+| UnComfy | Amber | Workflow data may not be trustworthy — see below |
+
+**UnComfy** lights when MBQ Viewer has reason to doubt the workflow panel reflects what
+actually generated the image. Possible causes: the file is not a ComfyUI PNG at all,
+it was renamed (breaking the embedded path), it's a preview save rather than a final
+output, or the `prompt` chunk parsed but looked structurally odd. It's a prompt to be
+sceptical, or 'uncomfortable' — the image is shown as-is, but treat any displayed parameters with caution.
 
 ---
 
