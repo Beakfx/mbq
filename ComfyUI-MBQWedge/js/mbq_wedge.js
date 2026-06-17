@@ -85,153 +85,267 @@ function updateWidgetMode(node, isInt) {
     rebuildNumberWidgets(node, mode);
 }
 
+const STR_WEDGE_TYPES = ["MBQWedgeSampler", "MBQWedgeScheduler"];
+
 app.registerExtension({
     name: "MBQ.Wedge",
 
     async beforeRegisterNodeDef(nodeType, nodeData) {
-        if (nodeData.name !== "MBQWedge") return;
+        // ── Numeric wedge ────────────────────────────────────────────────────
+        if (nodeData.name === "MBQWedge") {
+            nodeType.prototype.onNodeCreated = function() {
+                const lbl = this.addWidget("text", "_iterations", "—", () => {}, { serialize: false });
+                lbl.draw = function(ctx, node, widget_width, y, H) {
+                    ctx.save();
+                    ctx.font = "italic 13px Arial";
+                    ctx.fillStyle = "#ddd";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(`will produce ${this.value}`, 6, y + H / 2);
+                    ctx.restore();
+                };
+                lbl.mouse = () => false;
 
-        nodeType.prototype.onNodeCreated = function() {
+                const cur = this.addWidget("text", "_current", "—", () => {}, { serialize: false });
+                cur.draw = function(ctx, node, widget_width, y, H) {
+                    ctx.save();
+                    ctx.font = "italic 13px Arial";
+                    ctx.fillStyle = "#aaa";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(`current ${this.value}`, 6, y + H / 2);
+                    ctx.restore();
+                };
+                cur.mouse = () => false;
+
+                for (const name of ["start", "stop", "increment"]) {
+                    const w = this.widgets?.find(w => w.name === name);
+                    if (w) {
+                        const orig = w.callback;
+                        const node = this;
+                        w.callback = function(...args) {
+                            orig?.apply(this, args);
+                            updateIterations(node);
+                            updateCurrent(node);
+                        };
+                    }
+                }
+                updateWidgetMode(this, (this.outputs?.[0]?.links?.length ?? 0) > 0);
+                updateIterations(this);
+                updateCurrent(this);
+            };
+
+            nodeType.prototype.onConnectionsChange = function(type, slot, connected, link_info) {
+                if (connected && link_info && !this._mbqDisconnecting) {
+                    const graph = app.graph;
+                    if (graph) {
+                        // Auto-fill parameter_name from the connected target slot
+                        const targetNode = graph.getNodeById(link_info.target_id);
+                        const slotName = targetNode?.inputs?.[link_info.target_slot]?.name;
+                        if (slotName) {
+                            const w = this.widgets?.find(w => w.name === "parameter_name");
+                            if (w) w.value = slotName;
+                        }
+
+                        // Disconnect the other output — INT and FLOAT are mutually exclusive
+                        const newSlot = link_info.origin_slot;
+                        if (newSlot === 0 || newSlot === 1) {
+                            const otherSlot = 1 - newSlot;
+                            if (this.outputs?.[otherSlot]?.links?.length > 0) {
+                                this._mbqDisconnecting = true;
+                                this.disconnectOutput(otherSlot);
+                                this._mbqDisconnecting = false;
+                            }
+                        }
+                    }
+                }
+                const isInt = (connected && link_info)
+                    ? link_info.origin_slot === 0
+                    : (this.outputs?.[0]?.links?.length ?? 0) > 0;
+                updateWidgetMode(this, isInt);
+                updateIterations(this);
+                app.graph?.setDirtyCanvas(true, true);
+            };
+
+            return;
+        }
+
+        // ── String wedge (Sampler / Scheduler) ───────────────────────────────
+        if (!STR_WEDGE_TYPES.includes(nodeData.name)) return;
+
+        nodeType.prototype.onNodeCreated = function () {
             const lbl = this.addWidget("text", "_iterations", "—", () => {}, { serialize: false });
-            lbl.draw = function(ctx, node, widget_width, y, H) {
+            lbl.draw = function (ctx, node, widget_width, y, H) {
                 ctx.save();
                 ctx.font = "italic 13px Arial";
                 ctx.fillStyle = "#ddd";
                 ctx.textBaseline = "middle";
-                ctx.fillText(`will produce → ${this.value}`, 6, y + H / 2);
+                ctx.fillText(`will sweep ${this.value}`, 6, y + H / 2);
                 ctx.restore();
             };
             lbl.mouse = () => false;
 
-            const cur = this.addWidget("text", "_current", "—", () => {}, { serialize: false });
-            cur.draw = function(ctx, node, widget_width, y, H) {
-                ctx.save();
-                ctx.font = "italic 13px Arial";
-                ctx.fillStyle = "#aaa";
-                ctx.textBaseline = "middle";
-                ctx.fillText(`current → ${this.value}`, 6, y + H / 2);
-                ctx.restore();
-            };
-            cur.mouse = () => false;
+            const kind = nodeData.name === "MBQWedgeSampler" ? "samplers" : "schedulers";
+            const currentWidget = this.widgets?.find(w => w.name === "current");
+            const allValues = currentWidget?.options?.values ?? [];
+            this._mbqStringValues = allValues;
 
-            for (const name of ["start", "stop", "increment"]) {
-                const w = this.widgets?.find(w => w.name === name);
-                if (w) {
-                    const orig = w.callback;
-                    const node = this;
-                    w.callback = function(...args) {
-                        orig?.apply(this, args);
-                        updateIterations(node);
-                        updateCurrent(node);
-                    };
-                }
+            const updateLabel = () => {
+                const n = this._mbqStringValues.length;
+                const total = allValues.length;
+                lbl.value = n === total
+                    ? `all ${n} ${kind} → ${n} images`
+                    : `${n} of ${total} ${kind} → ${n} images`;
+            };
+            updateLabel();
+
+            // Optional filter textarea: leave blank to sweep all, one name per line
+            // to sweep only those. Invalid names are silently skipped.
+            const filterWidget = this.widgets?.find(w => w.name === "filter");
+            if (filterWidget) {
+                const validSet = new Set(allValues);
+                const updateFromFilter = () => {
+                    const lines = (filterWidget.value ?? "")
+                        .split("\n").map(s => s.trim()).filter(Boolean);
+                    this._mbqStringValues = lines.length === 0
+                        ? allValues
+                        : lines.filter(l => validSet.has(l));
+                    updateLabel();
+                };
+                updateFromFilter();
+                const orig = filterWidget.callback;
+                filterWidget.callback = function (...args) {
+                    orig?.apply(this, args);
+                    updateFromFilter();
+                };
             }
-            updateWidgetMode(this, (this.outputs?.[0]?.links?.length ?? 0) > 0);
-            updateIterations(this);
-            updateCurrent(this);
         };
 
-        nodeType.prototype.onConnectionsChange = function(type, slot, connected, link_info) {
-            if (connected && link_info && !this._mbqDisconnecting) {
-                const graph = app.graph;
-                if (graph) {
-                    // Auto-fill parameter_name from the connected target slot
-                    const targetNode = graph.getNodeById(link_info.target_id);
-                    const slotName = targetNode?.inputs?.[link_info.target_slot]?.name;
-                    if (slotName) {
-                        const w = this.widgets?.find(w => w.name === "parameter_name");
-                        if (w) w.value = slotName;
-                    }
-
-                    // Disconnect the other output — INT and FLOAT are mutually exclusive
-                    const newSlot = link_info.origin_slot;
-                    if (newSlot === 0 || newSlot === 1) {
-                        const otherSlot = 1 - newSlot;
-                        if (this.outputs?.[otherSlot]?.links?.length > 0) {
-                            this._mbqDisconnecting = true;
-                            this.disconnectOutput(otherSlot);
-                            this._mbqDisconnecting = false;
-                        }
-                    }
+        // Auto-fill parameter_name from the connected target slot name.
+        nodeType.prototype.onConnectionsChange = function (type, slot, connected, link_info) {
+            if (connected && link_info) {
+                const targetNode = app.graph?.getNodeById(link_info.target_id);
+                const slotName   = targetNode?.inputs?.[link_info.target_slot]?.name;
+                if (slotName) {
+                    const w = this.widgets?.find(w => w.name === "parameter_name");
+                    if (w) w.value = slotName;
                 }
             }
-            const isInt = (connected && link_info)
-                ? link_info.origin_slot === 0
-                : (this.outputs?.[0]?.links?.length ?? 0) > 0;
-            updateWidgetMode(this, isInt);
-            updateIterations(this);
             app.graph?.setDirtyCanvas(true, true);
         };
     },
 
     // Intercept api.queuePrompt once after registration.
-    // When an MBQWedge node is present, expand the single multi-value submission
-    // into N separate single-value jobs — same pattern ComfyUI uses for per-image
-    // seed randomization. Each job gets start=stop=V and current=V patched in,
-    // so every PNG's prompt chunk carries the exact swept value.
+    // Handles both numeric MBQWedge and string MBQWedge* nodes in a single wrapper.
+    // Each wedge type expands one Queue click into N separate single-value jobs so
+    // every PNG's prompt chunk carries the exact swept value.
     setup() {
         const _origQueue = api.queuePrompt.bind(api);
         api.queuePrompt = async function(number, data) {
             const prompt = data?.output ?? data?.prompt;
             if (!prompt) return _origQueue(number, data);
 
+            // ── Numeric wedge expansion ───────────────────────────────────────
             const wedgeId = Object.keys(prompt).find(
                 id => prompt[id]?.class_type === "MBQWedge"
             );
-            if (!wedgeId) return _origQueue(number, data);
-
-            const inp   = prompt[wedgeId].inputs;
-            const start = parseFloat(inp.start);
-            const step  = parseFloat(inp.increment);
-            const stop  = parseFloat(inp.stop);
-            if (isNaN(start) || isNaN(step) || step <= 0 || isNaN(stop)) {
-                return _origQueue(number, data);
-            }
-
-            // Compute sweep values — mirrors Python Decimal logic at float precision
-            const values = [];
-            let v = start;
-            while (v <= stop + 1e-9) {
-                values.push(Math.round(v * 100) / 100);
-                v = Math.round((v + step) * 1e9) / 1e9;
-            }
-            if (values.length === 0) return _origQueue(number, data);
-
-            const patchWedge = (p, val) => {
-                if (p[wedgeId]) {
-                    p[wedgeId].inputs.start   = val;
-                    p[wedgeId].inputs.stop    = val;
-                    p[wedgeId].inputs.current = val;
+            if (wedgeId) {
+                const inp   = prompt[wedgeId].inputs;
+                const start = parseFloat(inp.start);
+                const step  = parseFloat(inp.increment);
+                const stop  = parseFloat(inp.stop);
+                if (isNaN(start) || isNaN(step) || step <= 0 || isNaN(stop)) {
+                    return _origQueue(number, data);
                 }
-            };
 
-            const key = "output" in data ? "output" : "prompt";
-            let lastResult;
-            for (let i = 0; i < values.length; i++) {
-                let currentPrompt;
+                // Compute sweep values — mirrors Python Decimal logic at float precision
+                const values = [];
+                let v = start;
+                while (v <= stop + 1e-9) {
+                    values.push(Math.round(v * 100) / 100);
+                    v = Math.round((v + step) * 1e9) / 1e9;
+                }
+                if (values.length === 0) return _origQueue(number, data);
 
-                if (i === 0) {
-                    currentPrompt = JSON.parse(JSON.stringify(prompt));
-                } else {
-                    // Fire afterQueued on every graph widget so seeds advance per their
-                    // control_after_generate setting (randomize/increment/decrement/fixed),
-                    // then re-serialize the graph to capture the updated seed values.
-                    for (const node of app.graph?.nodes ?? []) {
-                        for (const widget of node.widgets ?? []) {
-                            if (typeof widget.afterQueued === "function") widget.afterQueued();
-                        }
+                const patchWedge = (p, val) => {
+                    if (p[wedgeId]) {
+                        p[wedgeId].inputs.start   = val;
+                        p[wedgeId].inputs.stop    = val;
+                        p[wedgeId].inputs.current = val;
                     }
-                    try {
-                        const fresh = await app.graphToPrompt();
-                        currentPrompt = fresh.output ?? fresh.prompt;
-                    } catch (_) {}
-                    if (!currentPrompt) currentPrompt = JSON.parse(JSON.stringify(prompt));
-                }
+                };
 
-                patchWedge(currentPrompt, values[i]);
-                lastResult = await _origQueue(number, { ...data, [key]: currentPrompt });
+                const key = "output" in data ? "output" : "prompt";
+                let lastResult;
+                for (let i = 0; i < values.length; i++) {
+                    let currentPrompt;
+
+                    if (i === 0) {
+                        currentPrompt = JSON.parse(JSON.stringify(prompt));
+                    } else {
+                        // Fire afterQueued on every graph widget so seeds advance per their
+                        // control_after_generate setting (randomize/increment/decrement/fixed),
+                        // then re-serialize the graph to capture the updated seed values.
+                        for (const node of app.graph?.nodes ?? []) {
+                            for (const widget of node.widgets ?? []) {
+                                if (typeof widget.afterQueued === "function") widget.afterQueued();
+                            }
+                        }
+                        try {
+                            const fresh = await app.graphToPrompt();
+                            currentPrompt = fresh.output ?? fresh.prompt;
+                        } catch (_) {}
+                        if (!currentPrompt) currentPrompt = JSON.parse(JSON.stringify(prompt));
+                    }
+
+                    patchWedge(currentPrompt, values[i]);
+                    lastResult = await _origQueue(number, { ...data, [key]: currentPrompt });
+                }
+                return lastResult;
             }
-            return lastResult;
+
+            // ── String wedge expansion ────────────────────────────────────────
+            // Only pick a wedge node whose output is actually wired to another
+            // node — mirrors the connection check in mbq_parser.py so that a
+            // stray/disconnected wedge in the graph is silently ignored.
+            const strWedgeId = Object.keys(prompt).find(id => {
+                if (!STR_WEDGE_TYPES.includes(prompt[id]?.class_type)) return false;
+                return Object.values(prompt).some(node =>
+                    node?.inputs && Object.values(node.inputs).some(
+                        v => Array.isArray(v) && String(v[0]) === id
+                    )
+                );
+            });
+            if (strWedgeId) {
+                const graphNode = app.graph?.nodes?.find(n => String(n.id) === String(strWedgeId));
+                const values = graphNode?._mbqStringValues;
+                if (values?.length) {
+                    const key = "output" in data ? "output" : "prompt";
+                    let lastResult;
+                    for (let i = 0; i < values.length; i++) {
+                        let currentPrompt;
+                        if (i === 0) {
+                            currentPrompt = JSON.parse(JSON.stringify(prompt));
+                        } else {
+                            for (const node of app.graph?.nodes ?? []) {
+                                for (const widget of node.widgets ?? []) {
+                                    if (typeof widget.afterQueued === "function") widget.afterQueued();
+                                }
+                            }
+                            try {
+                                const fresh = await app.graphToPrompt();
+                                currentPrompt = fresh.output ?? fresh.prompt;
+                            } catch (_) {}
+                            if (!currentPrompt) currentPrompt = JSON.parse(JSON.stringify(prompt));
+                        }
+                        if (currentPrompt[strWedgeId]) {
+                            currentPrompt[strWedgeId].inputs.current = values[i];
+                        }
+                        lastResult = await _origQueue(number, { ...data, [key]: currentPrompt });
+                    }
+                    return lastResult;
+                }
+            }
+
+            return _origQueue(number, data);
         };
     },
 });

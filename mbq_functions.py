@@ -336,6 +336,8 @@ class ImageCanvas(QGraphicsView):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        if self.fit_locked:
+            self.fit_zoom()
         self._reposition_overlay()
         if self._hint_label and self._hint_label.isVisible():
             self._hint_label.setGeometry(

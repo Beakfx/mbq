@@ -10,6 +10,8 @@ _CACHE_MAX = 20
 
 _SUPPRESS = {"SaveImage", "Note", "PrimitiveNode"}
 
+_MBQ_WEDGE_TYPES = {"MBQWedge", "MBQWedgeSampler", "MBQWedgeScheduler", "MBQWedgeStrings"}
+
 _SAMPLER_KEYS = {
     "steps", "cfg", "seed", "noise_seed", "sampler_name",
     "scheduler", "guidance", "denoise",
@@ -112,6 +114,18 @@ def _node_tier(class_type: str, params: dict) -> int:
     return 2
 
 
+def _wired_node_ids(prompt_json: dict) -> set:
+    """Return the set of node IDs whose output is referenced by at least one other node."""
+    wired: set = set()
+    for node in prompt_json.values():
+        if not isinstance(node, dict):
+            continue
+        for v in (node.get("inputs") or {}).values():
+            if isinstance(v, list) and len(v) >= 1:
+                wired.add(str(v[0]))
+    return wired
+
+
 def _split_sampler(entries: list) -> list:
     """Nodes mixing sampler-key params with content params → two entries."""
     out = []
@@ -156,13 +170,19 @@ def tier_prompt_nodes(prompt_json: dict) -> tuple[list, list, list]:
     t1: list = []
     t2: list = []
     t3: list = []
-    for node in prompt_json.values():
+    wired_ids = _wired_node_ids(prompt_json)
+    for nid, node in prompt_json.items():
         if not isinstance(node, dict):
             continue
         ctype = str(node.get("class_type") or "")
         title = str((node.get("_meta") or {}).get("title", ""))
         params = _scalar_inputs(node.get("inputs") or {})
         entry = {"class_type": ctype, "title": title, "params": params}
+        if ctype in _MBQ_WEDGE_TYPES:
+            # Connected wedge nodes belong in tier 1; disconnected ones are noise.
+            if nid in wired_ids:
+                t1.append(entry)
+            continue
         tier = _node_tier(ctype, params)
         [t1, t2, t3][tier - 1].append(entry)
     t1 = _split_sampler(t1)
@@ -186,50 +206,38 @@ def _saveimage_prefixes(prompt_json: dict) -> list:
 
 
 def get_wedge_data(prompt_json: dict) -> Optional[dict]:
-    """Return wedge info if an MBQWedge node is wired to a real parameter, else None.
+    """Return wedge info for the first connected MBQWedge node, else None.
 
-    Connection is determined by checking whether any other node in the prompt has
-    an input named `parameter_name` wired to the wedge node — the same wire that
-    makes the sweep meaningful. A wedge that is present but not connected (or only
-    connected to display/preview nodes) is silently ignored so the viewer stays clean.
-    The prompt JSON is never modified; this is read-only display logic.
+    Iterates all wedge nodes in the prompt. The first one whose output is actually
+    wired to a downstream parameter is used; unconnected wedge nodes are skipped.
+    This handles workflows that contain multiple wedge nodes (e.g. one connected
+    sampler wedge and one disconnected scheduler wedge sitting idle in the graph).
     """
-    wedge_id     = None
-    wedge_params = None
-
     for nid, node in prompt_json.items():
-        if isinstance(node, dict) and node.get("class_type") == "MBQWedge":
-            wedge_id     = nid
-            wedge_params = _scalar_inputs(node.get("inputs") or {})
-            break
-
-    if wedge_params is None:
-        return None
-
-    param_name = wedge_params.get("parameter_name", "")
-    if not param_name:
-        return None
-
-    # Check that some downstream node has an input whose NAME matches parameter_name
-    # and whose value is a wire reference [wedge_id, slot].
-    connected = any(
-        key == param_name
-        and isinstance(v, list) and len(v) >= 1
-        and str(v[0]) == wedge_id
-        for nid, node in prompt_json.items()
-        if nid != wedge_id and isinstance(node, dict)
-        for key, v in (node.get("inputs") or {}).items()
-    )
-    if not connected:
-        return None
-
-    return {
-        "parameter_name": param_name,
-        "current_value":  wedge_params.get("current"),
-        "start":          wedge_params.get("start"),
-        "increment":      wedge_params.get("increment"),
-        "stop":           wedge_params.get("stop"),
-    }
+        if not (isinstance(node, dict) and node.get("class_type") in _MBQ_WEDGE_TYPES):
+            continue
+        wedge_params = _scalar_inputs(node.get("inputs") or {})
+        param_name = wedge_params.get("parameter_name", "")
+        if not param_name:
+            continue
+        connected = any(
+            key == param_name
+            and isinstance(v, list) and len(v) >= 1
+            and str(v[0]) == nid
+            for other_nid, other_node in prompt_json.items()
+            if other_nid != nid and isinstance(other_node, dict)
+            for key, v in (other_node.get("inputs") or {}).items()
+        )
+        if not connected:
+            continue
+        return {
+            "parameter_name": param_name,
+            "current_value":  wedge_params.get("current"),
+            "start":          wedge_params.get("start"),
+            "increment":      wedge_params.get("increment"),
+            "stop":           wedge_params.get("stop"),
+        }
+    return None
 
 
 def get_png_metadata(file_path: str | Path) -> dict:

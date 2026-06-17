@@ -173,7 +173,7 @@ class MBQViewerApp(QMainWindow):
         """)
 
         self.main_layout.addWidget(self.center_group, 0, 1)
-        center_layout = QGridLayout(self.center_group)
+        self.center_layout = center_layout = QGridLayout(self.center_group)
         center_layout.setRowStretch(0, 5)
         center_layout.setRowStretch(1, 1)
         center_layout.setRowStretch(2, 0)
@@ -214,13 +214,24 @@ class MBQViewerApp(QMainWindow):
 
         center_layout.addWidget(self.filmstrip_frame, 1, 0)
 
-        # ---- Path Label ----
-        self.path_label = QLabel("")
-        self.path_label.setStyleSheet(
+        # ---- Path / Count row ----
+        _path_row = QWidget()
+        _path_row_layout = QHBoxLayout(_path_row)
+        _path_row_layout.setContentsMargins(0, 0, 0, 0)
+        _path_row_layout.setSpacing(0)
+        self.count_label = QLabel("")
+        self.count_label.setStyleSheet(
             "color: #888; font-size: 11px; font-family: 'Courier New'; padding: 1px 4px;"
         )
+        self.path_label = QLabel("")
+        self.path_label.setStyleSheet(
+            "color: #AAA; font-size: 11px; font-family: 'Courier New'; padding: 1px 4px;"
+        )
         self.path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        center_layout.addWidget(self.path_label, 2, 0)
+        _path_row_layout.addWidget(self.count_label)
+        _path_row_layout.addWidget(self.path_label, 1)
+        center_layout.addWidget(_path_row, 2, 0)
+        self._path_row = _path_row
 
         # ---- Button Frame ----
         self.button_frame = QFrame()
@@ -249,7 +260,7 @@ class MBQViewerApp(QMainWindow):
         # ---- Status Bulbs ----
         btn_layout.addStretch()
 
-        bulb_style = "color: #888; font-size: 10px;"
+        bulb_style = "color: #8d8d8d; font-size: 10px;"
 
         def _bulb_group(bulb, text):
             grp = QHBoxLayout()
@@ -404,21 +415,25 @@ class MBQViewerApp(QMainWindow):
         refresh_action.triggered.connect(self.refresh_folder)
         view_menu.addAction(refresh_action)
         view_menu.addSeparator()
-        self._lock_zoom_action = QAction("Lock Zoom", self, checkable=True, shortcut="Z")
+        self._lock_zoom_action = QAction("Lock Zoom\tZ", self, checkable=True)
         self._lock_zoom_action.toggled.connect(self._on_zoom_lock_toggled)
         view_menu.addAction(self._lock_zoom_action)
-        reset_zoom_action = QAction("Reset Zoom", self, shortcut="R")
+        reset_zoom_action = QAction("Reset Zoom\tR", self)
         reset_zoom_action.triggered.connect(self._reset_zoom)
         view_menu.addAction(reset_zoom_action)
-        self._fit_lock_action = QAction("Fit Lock", self, checkable=True, shortcut="F")
+        self._fit_lock_action = QAction("Fit Lock\tF", self, checkable=True)
         self._fit_lock_action.toggled.connect(self._on_fit_lock_toggled)
         view_menu.addAction(self._fit_lock_action)
         view_menu.addSeparator()
-        self._freeze_scroll_action = QAction("Freeze Scroll", self, checkable=True, shortcut="S")
+        self._freeze_scroll_action = QAction("Freeze Scroll\tS", self, checkable=True)
         self._freeze_scroll_action.toggled.connect(
             lambda checked: self.bulb_scroll.set_state("on" if checked else "off")
         )
         view_menu.addAction(self._freeze_scroll_action)
+        view_menu.addSeparator()
+        self._fullscreen_action = QAction("Full Screen", self, checkable=True, shortcut="F11")
+        self._fullscreen_action.toggled.connect(self._on_fullscreen_toggled)
+        view_menu.addAction(self._fullscreen_action)
         view_menu.addSeparator()
         overlay_menu = view_menu.addMenu("Wedge Overlay")
         overlay_group = QActionGroup(self)
@@ -454,6 +469,15 @@ class MBQViewerApp(QMainWindow):
         _sc_prev.activated.connect(self.show_prev_image)
         QShortcut(Qt.Key_Delete, self).activated.connect(self.delete_current_image)
         QShortcut(QKeySequence("Ctrl+Z"), self).activated.connect(self.undo_delete)
+        QShortcut(Qt.Key_Escape, self).activated.connect(self._exit_fullscreen)
+
+        # Redundant window-level shortcuts for the zoom/fit/scroll menu actions —
+        # action shortcuts can stop firing once the menu bar is hidden (fullscreen),
+        # so mirror the same direct-QShortcut pattern used for nav/delete above.
+        QShortcut(QKeySequence("Z"), self).activated.connect(self._lock_zoom_action.toggle)
+        QShortcut(QKeySequence("F"), self).activated.connect(self._fit_lock_action.toggle)
+        QShortcut(QKeySequence("R"), self).activated.connect(self._reset_zoom)
+        QShortcut(QKeySequence("S"), self).activated.connect(self._freeze_scroll_action.toggle)
 
         self.filmstrip_scroll.setFocusPolicy(Qt.NoFocus)
 
@@ -599,10 +623,69 @@ class MBQViewerApp(QMainWindow):
         if parent != self.folder_model.folder_path:
             self.load_folder_from_path(str(parent))
 
+    def _on_fullscreen_toggled(self, checked):
+        chrome = [self.left_spacer, self.right_metadata, self.filmstrip_frame,
+                  self.button_frame, self._path_row]
+        for w in chrome:
+            w.setVisible(not checked)
+        self.menuBar().setVisible(not checked)
+        # Hidden widgets still reserve their grid stretch share, leaving the
+        # canvas short of the window — zero those rows/columns out in fullscreen.
+        self.main_layout.setColumnStretch(2, 0 if checked else 1)
+        self.center_layout.setRowStretch(1, 0 if checked else 1)
+        # In fullscreen: strip the QGroupBox border/title and outer layout margins
+        # so the canvas truly fills edge-to-edge.
+        if checked:
+            # Cache inner layout defaults before zeroing them.
+            m = self.center_layout.contentsMargins()
+            self._cl_margins  = (m.left(), m.top(), m.right(), m.bottom())
+            self._cl_spacing  = self.center_layout.spacing()
+            self.main_layout.setContentsMargins(0, 0, 0, 0)
+            self.main_layout.setSpacing(0)
+            self.center_layout.setContentsMargins(0, 0, 0, 0)
+            self.center_layout.setSpacing(0)
+            self.center_group.setStyleSheet(
+                "QGroupBox { border: none; margin: 0; padding: 0; }"
+            )
+            self.showFullScreen()
+        else:
+            self.main_layout.setContentsMargins(10, 20, 10, 20)
+            self.main_layout.setSpacing(10)
+            if hasattr(self, "_cl_margins"):
+                self.center_layout.setContentsMargins(*self._cl_margins)
+                self.center_layout.setSpacing(self._cl_spacing)
+            self.center_group.setStyleSheet("""
+                QGroupBox {
+                    border: 2px solid #333333;
+                    border-radius: 4px;
+                    margin-top: 10px;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    subcontrol-position: top left;
+                    left: 10px;
+                    padding: 0 5px 0 5px;
+                    background: palette(window);
+                }
+            """)
+            self.showNormal()
+        # showFullScreen()/showNormal() can leave the window without OS keyboard
+        # focus on Windows, which makes shortcuts appear "broken" until clicked.
+        self.activateWindow()
+        self.image_view.setFocus(Qt.OtherFocusReason)
+
+    def _exit_fullscreen(self):
+        if self._fullscreen_action.isChecked():
+            self._fullscreen_action.setChecked(False)
+
     def _update_path_label(self):
-        self.path_label.setText(
-            str(self.folder_model.folder_path) if self.folder_model else ""
-        )
+        if self.folder_model:
+            n = len(self.folder_model.files)
+            self.count_label.setText(f"{n} image{'s' if n != 1 else ''}:")
+            self.path_label.setText(str(self.folder_model.folder_path))
+        else:
+            self.count_label.setText("")
+            self.path_label.setText("")
 
     def _show_empty_folder(self):
         size = min(self.image_view.viewport().width(),
@@ -661,7 +744,10 @@ class MBQViewerApp(QMainWindow):
                     new_p = {}
                     if "parameter_name" in p:
                         new_p["parameter_name"] = p["parameter_name"]
-                    new_p["current"] = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
+                    if isinstance(wedge_val, (int, float)):
+                        new_p["current"] = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
+                    else:
+                        new_p["current"] = str(wedge_val)
                     new_p.update({k: v for k, v in p.items() if k != "parameter_name"})
                     node["params"] = new_p
                 t1 = mbq_nodes + t1
@@ -707,7 +793,10 @@ class MBQViewerApp(QMainWindow):
             QTimer.singleShot(0, lambda: self._search_workflow(self.search_input.text()))
 
         if wedge and wedge_val is not None:
-            val_str = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
+            if isinstance(wedge_val, (int, float)):
+                val_str = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
+            else:
+                val_str = str(wedge_val)
             overlay_text = f"{wedge['parameter_name']}: {val_str}"
         else:
             overlay_text = None
@@ -762,6 +851,7 @@ class MBQViewerApp(QMainWindow):
             self.populate_filmstrip()
         else:
             self._show_empty_folder()
+        self._update_path_label()
 
     def undo_delete(self):
         if not self._undo_stack:
@@ -794,6 +884,7 @@ class MBQViewerApp(QMainWindow):
                 self.populate_filmstrip()
             except ValueError:
                 pass
+        self._update_path_label()
 
     def _restore_from_trash(self, original_path: str):
         import shutil
