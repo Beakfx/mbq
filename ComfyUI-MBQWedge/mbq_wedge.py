@@ -48,10 +48,10 @@ class MBQWedge:
 
 class MBQWedgeSampler:
     """
-    Sweeps all available sampler names.
-    Wire sampler_name output → any sampler_name input (e.g. KSampler).
-    Output type matches the sampler COMBO so ComfyUI accepts the link.
-    JS submits one job per sampler; viewer only lights if the output is connected.
+    Sweeps sampler names. Leave filter blank to sweep all; add names one per
+    line (or space-separated) to sweep only those. Output type matches the
+    sampler COMBO so ComfyUI accepts the link. JS submits one job per value;
+    viewer only lights if the output is connected.
     """
 
     @classmethod
@@ -59,6 +59,8 @@ class MBQWedgeSampler:
         return {
             "required": {
                 "parameter_name": ("STRING", {"default": "sampler_name", "multiline": False}),
+                "filter":         ("STRING", {"default": "", "multiline": True,
+                                              "placeholder": "leave blank to sweep all\none name per line"}),
                 "current":        (comfy.samplers.KSampler.SAMPLERS, {}),
             }
         }
@@ -68,7 +70,7 @@ class MBQWedgeSampler:
     FUNCTION  = "sweep"
     CATEGORY  = "MBQ"
 
-    def sweep(self, parameter_name, current):
+    def sweep(self, parameter_name, filter, current):
         return (current,)
 
 

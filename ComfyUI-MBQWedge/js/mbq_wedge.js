@@ -94,7 +94,7 @@ app.registerExtension({
         // ── Numeric wedge ────────────────────────────────────────────────────
         if (nodeData.name === "MBQWedge") {
             nodeType.prototype.onNodeCreated = function() {
-                const lbl = this.addWidget("text", "_iterations", "—", () => {}, { serialize: false });
+                const lbl = this.addWidget("custom", "_iterations", "—", () => {}, { serialize: false });
                 lbl.draw = function(ctx, node, widget_width, y, H) {
                     ctx.save();
                     ctx.font = "italic 13px Arial";
@@ -105,7 +105,7 @@ app.registerExtension({
                 };
                 lbl.mouse = () => false;
 
-                const cur = this.addWidget("text", "_current", "—", () => {}, { serialize: false });
+                const cur = this.addWidget("custom", "_current", "—", () => {}, { serialize: false });
                 cur.draw = function(ctx, node, widget_width, y, H) {
                     ctx.save();
                     ctx.font = "italic 13px Arial";
@@ -172,7 +172,7 @@ app.registerExtension({
         if (!STR_WEDGE_TYPES.includes(nodeData.name)) return;
 
         nodeType.prototype.onNodeCreated = function () {
-            const lbl = this.addWidget("text", "_iterations", "—", () => {}, { serialize: false });
+            const lbl = this.addWidget("custom", "_iterations", "—", () => {}, { serialize: false });
             lbl.draw = function (ctx, node, widget_width, y, H) {
                 ctx.save();
                 ctx.font = "italic 13px Arial";
@@ -186,6 +186,7 @@ app.registerExtension({
             const kind = nodeData.name === "MBQWedgeSampler" ? "samplers" : "schedulers";
             const currentWidget = this.widgets?.find(w => w.name === "current");
             const allValues = currentWidget?.options?.values ?? [];
+            this._mbqAllValues = allValues;
             this._mbqStringValues = allValues;
 
             const updateLabel = () => {
@@ -197,14 +198,16 @@ app.registerExtension({
             };
             updateLabel();
 
-            // Optional filter textarea: leave blank to sweep all, one name per line
-            // to sweep only those. Invalid names are silently skipped.
+            // Optional filter textarea: leave blank to sweep all, or list names
+            // separated by newlines and/or spaces to sweep only those (matches
+            // the space-separated text MBQ Viewer's metadata panel copies out).
+            // Invalid names are silently skipped.
             const filterWidget = this.widgets?.find(w => w.name === "filter");
             if (filterWidget) {
                 const validSet = new Set(allValues);
                 const updateFromFilter = () => {
                     const lines = (filterWidget.value ?? "")
-                        .split("\n").map(s => s.trim()).filter(Boolean);
+                        .split(/\s+/).map(s => s.trim()).filter(Boolean);
                     this._mbqStringValues = lines.length === 0
                         ? allValues
                         : lines.filter(l => validSet.has(l));
@@ -219,12 +222,34 @@ app.registerExtension({
             }
         };
 
-        // Auto-fill parameter_name from the connected target slot name.
+        // Auto-fill parameter_name from the connected target slot name. Also
+        // guards against ComfyUI's generic COMBO typing: a sampler-name COMBO
+        // and a scheduler-name COMBO both report the same link type, so the
+        // frontend happily lets you wire a Scheduler wedge into a sampler_name
+        // input (or vice versa). Compare the target widget's actual accepted
+        // values against our own list; if they don't match, undo the link.
         nodeType.prototype.onConnectionsChange = function (type, slot, connected, link_info) {
-            if (connected && link_info) {
-                const targetNode = app.graph?.getNodeById(link_info.target_id);
-                const slotName   = targetNode?.inputs?.[link_info.target_slot]?.name;
-                if (slotName) {
+            if (connected && link_info && !this._mbqDisconnecting) {
+                const targetNode   = app.graph?.getNodeById(link_info.target_id);
+                const slotName     = targetNode?.inputs?.[link_info.target_slot]?.name;
+                const targetWidget = targetNode?.widgets?.find(w => w.name === slotName);
+                const targetValues = targetWidget?.options?.values;
+                const ours = this._mbqAllValues ?? [];
+                const matches = Array.isArray(targetValues)
+                    && targetValues.length === ours.length
+                    && targetValues.every((v, i) => v === ours[i]);
+
+                if (!matches) {
+                    this._mbqDisconnecting = true;
+                    this.disconnectOutput(link_info.origin_slot);
+                    this._mbqDisconnecting = false;
+                    const kind = nodeData.name === "MBQWedgeSampler" ? "samplers" : "schedulers";
+                    const msg = `"${slotName ?? "that input"}" doesn't take ${kind} — connection removed.`;
+                    app.extensionManager?.toast?.add?.({
+                        severity: "warn", summary: "MBQ Wedge", detail: msg, life: 4000,
+                    });
+                    console.warn(`[MBQ Wedge] ${msg}`);
+                } else if (slotName) {
                     const w = this.widgets?.find(w => w.name === "parameter_name");
                     if (w) w.value = slotName;
                 }
@@ -243,106 +268,127 @@ app.registerExtension({
             const prompt = data?.output ?? data?.prompt;
             if (!prompt) return _origQueue(number, data);
 
-            // ── Numeric wedge expansion ───────────────────────────────────────
-            const wedgeId = Object.keys(prompt).find(
-                id => prompt[id]?.class_type === "MBQWedge"
+            // A wedge only counts as "active" if its output is actually wired to
+            // a downstream parameter — mirrors the connection check in mbq_parser.py
+            // so a stray/disconnected wedge sitting in the graph is ignored.
+            const isWired = (id) => Object.values(prompt).some(node =>
+                node?.inputs && Object.values(node.inputs).some(
+                    v => Array.isArray(v) && String(v[0]) === id
+                )
             );
-            if (wedgeId) {
-                const inp   = prompt[wedgeId].inputs;
+
+            // ── Numeric wedge candidate ────────────────────────────────────────
+            const numericId = Object.keys(prompt).find(
+                id => prompt[id]?.class_type === "MBQWedge" && isWired(id)
+            );
+            let numericValues = null;
+            if (numericId) {
+                const inp   = prompt[numericId].inputs;
                 const start = parseFloat(inp.start);
                 const step  = parseFloat(inp.increment);
                 const stop  = parseFloat(inp.stop);
-                if (isNaN(start) || isNaN(step) || step <= 0 || isNaN(stop)) {
-                    return _origQueue(number, data);
-                }
-
-                // Compute sweep values — mirrors Python Decimal logic at float precision
-                const values = [];
-                let v = start;
-                while (v <= stop + 1e-9) {
-                    values.push(Math.round(v * 100) / 100);
-                    v = Math.round((v + step) * 1e9) / 1e9;
-                }
-                if (values.length === 0) return _origQueue(number, data);
-
-                const patchWedge = (p, val) => {
-                    if (p[wedgeId]) {
-                        p[wedgeId].inputs.start   = val;
-                        p[wedgeId].inputs.stop    = val;
-                        p[wedgeId].inputs.current = val;
+                if (!isNaN(start) && !isNaN(step) && step > 0 && !isNaN(stop)) {
+                    // Compute sweep values — mirrors Python Decimal logic at float precision
+                    const values = [];
+                    let v = start;
+                    while (v <= stop + 1e-9) {
+                        values.push(Math.round(v * 100) / 100);
+                        v = Math.round((v + step) * 1e9) / 1e9;
                     }
-                };
+                    if (values.length > 0) numericValues = values;
+                }
+            }
 
-                const key = "output" in data ? "output" : "prompt";
+            // ── String wedge candidate (Sampler / Scheduler) ───────────────────
+            const strWedgeId = Object.keys(prompt).find(
+                id => STR_WEDGE_TYPES.includes(prompt[id]?.class_type) && isWired(id)
+            );
+            let strValues = null;
+            if (strWedgeId) {
+                const graphNode = app.graph?.nodes?.find(n => String(n.id) === String(strWedgeId));
+                if (graphNode?._mbqStringValues?.length) strValues = graphNode._mbqStringValues;
+            }
+
+            const key = "output" in data ? "output" : "prompt";
+
+            // ── Sanity check: only one wedge may drive a sweep at a time ───────
+            // Multiple connected wedges (numeric + Scheduler, or Sampler + Scheduler,
+            // etc.) is ambiguous — silently picking one produces confusing,
+            // order-dependent results. Refuse to guess.
+            const activeKinds = [];
+            if (numericValues) activeKinds.push(prompt[numericId]?.class_type ?? "MBQWedge");
+            if (strValues)     activeKinds.push(prompt[strWedgeId]?.class_type ?? "MBQWedge");
+            if (activeKinds.length > 1) {
+                const msg = `Multiple MBQ Wedge nodes are connected at once (${activeKinds.join(", ")}). `
+                          + `Only one can drive a sweep — queuing a single normal job instead. `
+                          + `Disconnect the extra wedge(s) to resume sweeping.`;
+                app.extensionManager?.toast?.add?.({
+                    severity: "warn", summary: "MBQ Wedge", detail: msg, life: 6000,
+                });
+                console.warn(`[MBQ Wedge] ${msg}`);
+
+                // The numeric MBQWedge has OUTPUT_IS_LIST=True in Python, so even
+                // submitting the prompt completely unmodified, ComfyUI's own server-side
+                // execution will still expand start..stop into N separate renders —
+                // independent of our JS. Clamp it to a single value so the fallback
+                // submission can't silently multiply images behind the warning.
+                if (numericId) {
+                    const safePrompt = JSON.parse(JSON.stringify(prompt));
+                    if (safePrompt[numericId]) {
+                        safePrompt[numericId].inputs.stop = safePrompt[numericId].inputs.start;
+                    }
+                    return _origQueue(number, { ...data, [key]: safePrompt });
+                }
+                return _origQueue(number, data);
+            }
+
+            // Advances seeds per control_after_generate, then re-serializes the graph
+            // so each subsequent job in the sweep carries the freshly advanced seed.
+            const reserializePrompt = async () => {
+                for (const node of app.graph?.nodes ?? []) {
+                    for (const widget of node.widgets ?? []) {
+                        if (typeof widget.afterQueued === "function") widget.afterQueued();
+                    }
+                }
+                try {
+                    const fresh = await app.graphToPrompt();
+                    return fresh.output ?? fresh.prompt;
+                } catch (_) {
+                    return null;
+                }
+            };
+
+            // Shared by both wedge types: submit one job per value, re-serializing the
+            // graph between jobs (via reserializePrompt) so seeds advance correctly.
+            // patchFn mutates the cloned prompt to set that job's swept value.
+            const runSweep = async (values, patchFn) => {
                 let lastResult;
                 for (let i = 0; i < values.length; i++) {
-                    let currentPrompt;
-
-                    if (i === 0) {
-                        currentPrompt = JSON.parse(JSON.stringify(prompt));
-                    } else {
-                        // Fire afterQueued on every graph widget so seeds advance per their
-                        // control_after_generate setting (randomize/increment/decrement/fixed),
-                        // then re-serialize the graph to capture the updated seed values.
-                        for (const node of app.graph?.nodes ?? []) {
-                            for (const widget of node.widgets ?? []) {
-                                if (typeof widget.afterQueued === "function") widget.afterQueued();
-                            }
-                        }
-                        try {
-                            const fresh = await app.graphToPrompt();
-                            currentPrompt = fresh.output ?? fresh.prompt;
-                        } catch (_) {}
-                        if (!currentPrompt) currentPrompt = JSON.parse(JSON.stringify(prompt));
-                    }
-
-                    patchWedge(currentPrompt, values[i]);
+                    const currentPrompt = i === 0
+                        ? JSON.parse(JSON.stringify(prompt))
+                        : (await reserializePrompt()) ?? JSON.parse(JSON.stringify(prompt));
+                    patchFn(currentPrompt, values[i]);
                     lastResult = await _origQueue(number, { ...data, [key]: currentPrompt });
                 }
                 return lastResult;
+            };
+
+            if (numericValues) {
+                return runSweep(numericValues, (p, val) => {
+                    if (p[numericId]) {
+                        p[numericId].inputs.start   = val;
+                        p[numericId].inputs.stop    = val;
+                        p[numericId].inputs.current = val;
+                    }
+                });
             }
 
-            // ── String wedge expansion ────────────────────────────────────────
-            // Only pick a wedge node whose output is actually wired to another
-            // node — mirrors the connection check in mbq_parser.py so that a
-            // stray/disconnected wedge in the graph is silently ignored.
-            const strWedgeId = Object.keys(prompt).find(id => {
-                if (!STR_WEDGE_TYPES.includes(prompt[id]?.class_type)) return false;
-                return Object.values(prompt).some(node =>
-                    node?.inputs && Object.values(node.inputs).some(
-                        v => Array.isArray(v) && String(v[0]) === id
-                    )
-                );
-            });
-            if (strWedgeId) {
-                const graphNode = app.graph?.nodes?.find(n => String(n.id) === String(strWedgeId));
-                const values = graphNode?._mbqStringValues;
-                if (values?.length) {
-                    const key = "output" in data ? "output" : "prompt";
-                    let lastResult;
-                    for (let i = 0; i < values.length; i++) {
-                        let currentPrompt;
-                        if (i === 0) {
-                            currentPrompt = JSON.parse(JSON.stringify(prompt));
-                        } else {
-                            for (const node of app.graph?.nodes ?? []) {
-                                for (const widget of node.widgets ?? []) {
-                                    if (typeof widget.afterQueued === "function") widget.afterQueued();
-                                }
-                            }
-                            try {
-                                const fresh = await app.graphToPrompt();
-                                currentPrompt = fresh.output ?? fresh.prompt;
-                            } catch (_) {}
-                            if (!currentPrompt) currentPrompt = JSON.parse(JSON.stringify(prompt));
-                        }
-                        if (currentPrompt[strWedgeId]) {
-                            currentPrompt[strWedgeId].inputs.current = values[i];
-                        }
-                        lastResult = await _origQueue(number, { ...data, [key]: currentPrompt });
+            if (strValues) {
+                return runSweep(strValues, (p, val) => {
+                    if (p[strWedgeId]) {
+                        p[strWedgeId].inputs.current = val;
                     }
-                    return lastResult;
-                }
+                });
             }
 
             return _origQueue(number, data);

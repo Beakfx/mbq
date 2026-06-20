@@ -1,4 +1,4 @@
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import html as _html
 import send2trash
@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QTextEdit, QMessageBox, QFileDialog, QScrollArea, QLineEdit,
 )
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QPixmap, QPainter, QDrag, QColor, QIcon, QShortcut, QPalette, QKeySequence
-from PySide6.QtCore import Qt, QTimer, QEvent, QUrl, QMimeData
+from PySide6.QtCore import Qt, QTimer, QEvent, QUrl, QMimeData, qInstallMessageHandler
 from mbq_functions import ImageCanvas, ImageFolder, WorkflowCache
 from mbq_parser import get_png_metadata
 
@@ -25,6 +25,16 @@ C_NODE_HEADER = "#7ec8e3"   # node class name — muted cyan
 C_NODE_TITLE  = "#888888"   # (title) suffix — mid grey
 C_PARAM_KEY   = "#c8b86e"   # param key      — low yellow
 C_PARAM_VALUE = "#dddddd"   # param value    — near-white
+
+
+_MBQ_KEY_LABELS = {"filter": "wedge list"}  # display-only rename, distinct from ComfyUI's own "filter" widgets
+
+
+def _format_wedge_value(v) -> str:
+    """Display a swept wedge value: bare int for whole numbers, 2dp for floats, str() otherwise."""
+    if isinstance(v, (int, float)):
+        return str(int(v)) if v == int(v) else f"{v:.2f}"
+    return str(v)
 
 
 def _format_node_block(entry: dict) -> str:
@@ -45,7 +55,8 @@ def _format_node_block(entry: dict) -> str:
             val = r[:60] + ("..." if len(r) > 60 else "")
         else:
             val = str(v)
-        ek = _html.escape(k)
+        display_k = _MBQ_KEY_LABELS.get(k, k) if ctype.startswith("MBQWedge") else k
+        ek = _html.escape(display_k)
         ev = _html.escape(val)
         lines.append(
             f'&nbsp;&nbsp;<span style="color:{C_PARAM_KEY};">{ek}:</span>'
@@ -86,7 +97,7 @@ def _make_folder_pixmap(name: str, size: int) -> QPixmap:
     p.drawRoundedRect(0, body_y - tab_h, tab_w, tab_h + 4, 2, 2)
     p.setPen(QColor("#dddddd"))
     font = p.font()
-    font.setPointSize(max(9, size // 7))
+    font.setPointSize(max(7, size // 9))
     p.setFont(font)
     label = name[:12] + ("…" if len(name) > 12 else "")
     text_y = body_y + body_h + 2
@@ -130,8 +141,10 @@ class MBQViewerApp(QMainWindow):
         self.folder_model = None
         self.image_cache = {}
         self.thumb_cache = {}
-        self._undo_stack: list[str] = []
+        self._undo_stack: list[list[str]] = []  # each entry is one delete action's batch of paths
         self._thumb_labels: list[QLabel] = []
+        self._filmstrip_selection: set[int] = set()
+        self._filmstrip_anchor: int | None = None
 
         self._wedge_corner = "bottom_left"
 
@@ -693,6 +706,24 @@ class MBQViewerApp(QMainWindow):
         size = max(size, 120)
         pix = _make_folder_pixmap(self.folder_model.folder_path.name, size)
         self.image_view.load_image_from_pixmap(pix)
+        self._clear_metadata_panel()
+
+    def _clear_metadata_panel(self):
+        """Reset the workflow panel, bulbs, and canvas overlay to their no-image state."""
+        self.file_name_value.setText("—")
+        self.file_name_value.setStyleSheet("")
+        self.file_dim_value.setText("—")
+        self.file_size_value.setText("—")
+        self.file_mod_value.setText("—")
+        self.primary_display.setPlainText("")
+        self.tier3_display.setPlainText("")
+        self.tier3_display.setVisible(False)
+        self._tier3_count = 0
+        self.tier3_btn.setVisible(False)
+        self.bulb_uncomfy.set_state("off")
+        self.bulb_wedge.set_state("off")
+        self.copy_prompt_btn.setEnabled(False)
+        self.image_view.set_wedge_overlay(None, getattr(self, "_wedge_corner", "bottom_left"))
 
     # ---- Metadata display ----
 
@@ -738,19 +769,25 @@ class MBQViewerApp(QMainWindow):
             t1 = [n for n in t1 if not is_mbq(n)]
             t2 = [n for n in t2 if not is_mbq(n)]
             t3 = [n for n in t3 if not is_mbq(n)]
-            if wedge and wedge_val is not None:
-                for node in mbq_nodes:
+
+            active_type = wedge.get("class_type") if wedge else None
+            if wedge and wedge_val is not None and active_type:
+                # Only the wedge node get_wedge_data actually matched gets its
+                # display reformatted with the swept value — other wedge-type
+                # nodes present in the graph (disconnected, or simply not the
+                # active one) must not be stamped with a value that isn't theirs.
+                active_nodes = [n for n in mbq_nodes if n.get("class_type") == active_type]
+                other_nodes  = [n for n in mbq_nodes if n.get("class_type") != active_type]
+                for node in active_nodes:
                     p = node["params"]
                     new_p = {}
                     if "parameter_name" in p:
                         new_p["parameter_name"] = p["parameter_name"]
-                    if isinstance(wedge_val, (int, float)):
-                        new_p["current"] = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
-                    else:
-                        new_p["current"] = str(wedge_val)
+                    new_p["current"] = _format_wedge_value(wedge_val)
                     new_p.update({k: v for k, v in p.items() if k != "parameter_name"})
                     node["params"] = new_p
-                t1 = mbq_nodes + t1
+                t1 = active_nodes + t1
+                t3 = t3 + other_nodes
             else:
                 t3 = t3 + mbq_nodes
 
@@ -793,10 +830,7 @@ class MBQViewerApp(QMainWindow):
             QTimer.singleShot(0, lambda: self._search_workflow(self.search_input.text()))
 
         if wedge and wedge_val is not None:
-            if isinstance(wedge_val, (int, float)):
-                val_str = str(int(wedge_val)) if wedge_val == int(wedge_val) else f"{wedge_val:.2f}"
-            else:
-                val_str = str(wedge_val)
+            val_str = _format_wedge_value(wedge_val)
             overlay_text = f"{wedge['parameter_name']}: {val_str}"
         else:
             overlay_text = None
@@ -809,64 +843,103 @@ class MBQViewerApp(QMainWindow):
         arrow = "▼" if visible else "▶"
         self.tier3_btn.setText(f'<span style="font-size:18px;">{arrow}</span> plumbing ({n} nodes)')
 
+    def _selected_file_infos(self):
+        if not self.folder_model:
+            return []
+        return [
+            self.folder_model.files[i]
+            for i in sorted(self._filmstrip_selection)
+            if 0 <= i < len(self.folder_model.files)
+        ]
+
     def delete_current_image(self):
         if not self.folder_model or not self.folder_model.files:
             return
-        file_info = self.folder_model.current()
-        if not file_info:
+        targets = self._selected_file_infos()
+        if len(targets) <= 1:
+            current = self.folder_model.current()
+            targets = [current] if current else []
+        if not targets:
             return
-        path = file_info["path"]
-        try:
-            send2trash.send2trash(path)
-            can_undo = True
-        except send2trash.TrashPermissionError:
-            reply = QMessageBox.warning(
-                self, "Cannot move to trash",
-                f"This file is on a network share or a filesystem that doesn't support trash.\n\n"
-                f"{file_info['name']}\n\n"
-                "Delete permanently? This cannot be undone.",
+        self._delete_images(targets)
+
+    def _delete_images(self, file_infos):
+        if len(file_infos) > 1:
+            reply = QMessageBox.question(
+                self, "Delete images",
+                f"Move {len(file_infos)} images to the Recycle Bin / Trash?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
             if reply != QMessageBox.StandardButton.Yes:
                 return
+
+        undoable_batch = []
+        for file_info in file_infos:
+            path = file_info["path"]
             try:
-                os.remove(path)
+                send2trash.send2trash(path)
+                undoable_batch.append(path)
+            except send2trash.TrashPermissionError:
+                reply = QMessageBox.warning(
+                    self, "Cannot move to trash",
+                    f"This file is on a network share or a filesystem that doesn't support trash.\n\n"
+                    f"{file_info['name']}\n\n"
+                    "Delete permanently? This cannot be undone.",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Cancel,
+                )
+                if reply != QMessageBox.StandardButton.Yes:
+                    continue
+                try:
+                    os.remove(path)
+                except Exception as e:
+                    QMessageBox.warning(self, "Delete failed", str(e))
+                    continue
             except Exception as e:
                 QMessageBox.warning(self, "Delete failed", str(e))
-                return
-            can_undo = False
-        except Exception as e:
-            QMessageBox.warning(self, "Delete failed", str(e))
-            return
-        if can_undo:
-            self._undo_stack.append(path)
-        for key in [k for k in self.thumb_cache if k[0] == path]:
-            del self.thumb_cache[key]
-        self.folder_model.remove(path)
+                continue
+            for key in [k for k in self.thumb_cache if k[0] == path]:
+                del self.thumb_cache[key]
+            self.folder_model.remove(path)
+
+        if undoable_batch:
+            self._undo_stack.append(undoable_batch)
+
         if self.folder_model.files:
             current = self.folder_model.current()
             self.display_image(current["path"])
             self.update_metadata(current)
-            self.populate_filmstrip()
         else:
             self._show_empty_folder()
+        self.populate_filmstrip()
         self._update_path_label()
 
     def undo_delete(self):
         if not self._undo_stack:
             return
-        path = self._undo_stack[-1]
-        try:
-            self._restore_from_trash(path)
-        except Exception as e:
+        batch = self._undo_stack.pop()
+        restored = []
+        failures = []
+        for path in batch:
+            try:
+                self._restore_from_trash(path)
+                restored.append(path)
+            except Exception as e:
+                failures.append((path, e))
+
+        if failures:
+            detail = "\n\n".join(
+                f"{os.path.basename(p)}: {e}\nOriginal location: {p}" for p, e in failures
+            )
             QMessageBox.information(
                 self, "Undo",
-                f"Could not restore automatically:\n{e}\n\n"
-                f"File is in your Recycle Bin / Trash.\nOriginal location: {path}"
+                f"Could not restore {len(failures)} of {len(batch)} file(s) automatically. "
+                f"They remain in your Recycle Bin / Trash.\n\n{detail}"
             )
+        if not restored:
             return
-        self._undo_stack.pop()
+
         if self.folder_model:
             current_path = (self.folder_model.current() or {}).get("path")
             self.folder_model.scan_folder()
@@ -876,7 +949,7 @@ class MBQViewerApp(QMainWindow):
                 except ValueError:
                     pass
             try:
-                idx = [f["path"] for f in self.folder_model.files].index(path)
+                idx = [f["path"] for f in self.folder_model.files].index(restored[-1])
                 self.folder_model.index = idx
                 current = self.folder_model.current()
                 self.display_image(current["path"])
@@ -997,7 +1070,21 @@ class MBQViewerApp(QMainWindow):
 
     # ---- Filmstrip ----
 
+    def _thumb_border(self, idx, current_idx):
+        if idx == current_idx:
+            return "border: 2px solid #22aa33;"
+        if idx in self._filmstrip_selection:
+            return "border: 2px solid #2f6b3a;"
+        return "border: 1px solid #444;"
+
+    def _restyle_filmstrip(self):
+        current_idx = self.folder_model.index if self.folder_model else -1
+        for idx, lbl in enumerate(self._thumb_labels):
+            lbl.setStyleSheet(self._thumb_border(idx, current_idx))
+
     def populate_filmstrip(self):
+        self._filmstrip_selection.clear()
+        self._filmstrip_anchor = None
         for i in reversed(range(self.thumb_layout.count())):
             item = self.thumb_layout.takeAt(i)
             if widget := item.widget():
@@ -1047,11 +1134,7 @@ class MBQViewerApp(QMainWindow):
             lbl.setPixmap(self.thumb_cache[cache_key])
             lbl.setFixedSize(_THUMB_SIZE, _THUMB_SIZE)
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet(
-                "border: 2px solid #22aa33;"
-                if actual_idx == center_index else
-                "border: 1px solid #444;"
-            )
+            lbl.setStyleSheet(self._thumb_border(actual_idx, center_index))
             lbl.setCursor(Qt.PointingHandCursor)
 
             def _press(e, w=lbl):
@@ -1078,7 +1161,18 @@ class MBQViewerApp(QMainWindow):
                 if e.button() == Qt.LeftButton:
                     start = getattr(w, '_drag_start', None)
                     if start is not None and (e.position().toPoint() - start).manhattanLength() < 8:
+                        mods = e.modifiers()
+                        if mods & Qt.ShiftModifier and self._filmstrip_anchor is not None:
+                            lo, hi = sorted((self._filmstrip_anchor, idx))
+                            self._filmstrip_selection = set(range(lo, hi + 1))
+                        elif mods & Qt.ControlModifier:
+                            self._filmstrip_selection.symmetric_difference_update({idx})
+                            self._filmstrip_anchor = idx
+                        else:
+                            self._filmstrip_anchor = idx
+                            self._filmstrip_selection = {idx}
                         self.jump_to_index(idx)
+                        self._restyle_filmstrip()
 
             lbl.mousePressEvent   = _press
             lbl.mouseMoveEvent    = _move
@@ -1092,19 +1186,26 @@ class MBQViewerApp(QMainWindow):
         self._scroll_to_current()
 
     def _scroll_to_current(self, prev_idx=None):
-        if prev_idx is not None and 0 <= prev_idx < len(self._thumb_labels):
-            self._thumb_labels[prev_idx].setStyleSheet("border: 1px solid #444;")
         idx = self.folder_model.index if self.folder_model else -1
+        if prev_idx is not None and 0 <= prev_idx < len(self._thumb_labels):
+            self._thumb_labels[prev_idx].setStyleSheet(self._thumb_border(prev_idx, idx))
         if 0 <= idx < len(self._thumb_labels):
             lbl = self._thumb_labels[idx]
-            lbl.setStyleSheet("border: 2px solid #22aa33;")
-            QTimer.singleShot(0, lambda: self._center_on_label(lbl))
+            lbl.setStyleSheet(self._thumb_border(idx, idx))
+            QTimer.singleShot(0, lambda: self._ensure_visible(lbl))
 
-    def _center_on_label(self, lbl):
+    def _ensure_visible(self, lbl):
+        """Scroll the filmstrip just enough to bring lbl into view — never recenters
+        if it's already visible, so nonlinear selection doesn't yank the strip around."""
         sb = self.filmstrip_scroll.horizontalScrollBar()
-        lbl_center = lbl.x() + lbl.width() // 2
-        viewport_half = self.filmstrip_scroll.viewport().width() // 2
-        sb.setValue(lbl_center - viewport_half)
+        viewport_w = self.filmstrip_scroll.viewport().width()
+        left, right = lbl.x(), lbl.x() + lbl.width()
+        view_left = sb.value()
+        view_right = view_left + viewport_w
+        if left < view_left:
+            sb.setValue(left)
+        elif right > view_right:
+            sb.setValue(right - viewport_w)
 
     # ---- Zoom / view ----
 
@@ -1181,29 +1282,37 @@ class MBQViewerApp(QMainWindow):
         QMessageBox.about(
             self,
             "About MBQ",
-            "MBQ Viewer\n"
+            f"MBQ Viewer v{__version__}\n"
             "An OpenGL-accelerated image viewer built for ComfyUI workflows.\n\n"
             "Reads the prompt JSON embedded in PNG files by ComfyUI's SaveImage\n"
             "node and displays generation parameters — model, prompts, sampler,\n"
             "CFG, seed, steps — in a colour-coded side panel.\n\n"
             "MBQ Wedge\n"
-            "The companion ComfyUI node sweeps any numeric parameter (steps, CFG,\n"
-            "guidance…) across a range, queuing one job per value. Each output PNG\n"
-            "has its exact swept value embedded; MBQ overlays it on the canvas and\n"
-            "highlights it in the metadata panel.\n\n"
+            "Three companion ComfyUI nodes sweep a parameter across a range,\n"
+            "queuing one job per value: MBQ Wedge (numeric — steps, CFG,\n"
+            "guidance…), MBQ Wedge Sampler, and MBQ Wedge Scheduler. Each output\n"
+            "PNG has its exact swept value embedded; MBQ overlays it on the\n"
+            "canvas and highlights it in the metadata panel.\n\n"
             "Keyboard shortcuts\n"
             "  Ctrl+O    open image\n"
             "  ← / →     previous / next image\n"
+            "  Delete    move image(s) to Recycle Bin / Trash\n"
+            "  Ctrl+Z    restore last deleted image(s)\n"
+            "  F5         refresh folder\n"
             "  Z          toggle zoom lock\n"
-            "  S          toggle scroll freeze\n"
-            "  R          reset zoom (100%), clear locks\n"
             "  F          toggle fit lock (auto-fit each image)\n"
+            "  R          reset zoom (100%), clear locks\n"
+            "  S          toggle scroll freeze\n"
+            "  F11       enter / exit full screen\n"
+            "  Esc       exit full screen\n"
             "  Ctrl+Q    quit\n\n"
             "github.com/Beakfx/mbq",
         )
 
     def _open_help(self):
-        QDesktopServices.openUrl(QUrl("https://github.com/Beakfx/mbq"))
+        QDesktopServices.openUrl(QUrl(
+            "https://github.com/Beakfx/mbq/blob/main/README.md#keyboard-shortcuts"
+        ))
 
     # ---- Event filter ----
 
@@ -1222,7 +1331,17 @@ class MBQViewerApp(QMainWindow):
         return self.workflow_cache.get(file_path, get_png_metadata)
 
 
+def _qt_message_filter(msg_type, context, message):
+    # "drag leave received before drag enter" is a known-benign QGraphicsView
+    # internal warning (Qt's own drag bookkeeping, not raised by our code) —
+    # drop it so it doesn't spam stderr/the console on every drag-and-drop.
+    if "drag leave received before drag enter" in message:
+        return
+    sys.stderr.write(message + "\n")
+
+
 if __name__ == "__main__":
+    qInstallMessageHandler(_qt_message_filter)
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     _p = QPalette()

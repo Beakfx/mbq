@@ -231,6 +231,7 @@ def get_wedge_data(prompt_json: dict) -> Optional[dict]:
         if not connected:
             continue
         return {
+            "class_type":     node.get("class_type"),
             "parameter_name": param_name,
             "current_value":  wedge_params.get("current"),
             "start":          wedge_params.get("start"),
