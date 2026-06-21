@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-mbqwedge"
 version = "1.1.0"
-description = "Sweep any ComfyUI numeric parameter across a range and inspect results in MBQ Viewer"
+description = "Compare ComfyUI parameter values without contact sheets — sweep numerics, samplers, or schedulers, then inspect each result full-res in MBQ Viewer."
 license = { file = "LICENSE" }
 readme = "README.md"
 
