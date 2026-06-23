@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-mbqwedge"
-version = "1.1.0"
+version = "1.2.0"
 description = "Compare ComfyUI parameter values without contact sheets — sweep numerics, samplers, or schedulers, then inspect each result full-res in MBQ Viewer."
 license = { file = "LICENSE" }
 readme = "README.md"
@@ -8,5 +8,5 @@ readme = "README.md"
 [tool.comfy]
 PublisherId = "beakfx"
 DisplayName = "MBQ Wedge"
-Icon = "assets/mbq_icon.png"
+Icon = "https://raw.githubusercontent.com/Beakfx/mbq/main/assets/mbq_icon.png"
 Tags = ["parameter wedge", "sweep", "workflow", "utility"]

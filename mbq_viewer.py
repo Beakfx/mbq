@@ -1,4 +1,4 @@
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 import html as _html
 import send2trash
@@ -1239,8 +1239,9 @@ class MBQViewerApp(QMainWindow):
     # ---- Copy actions ----
 
     def _copy_image(self):
-        if self.image_view.image_item:
-            QApplication.clipboard().setPixmap(self.image_view.image_item.pixmap())
+        pixmap = self.image_view.original_pixmap()
+        if pixmap is not None:
+            QApplication.clipboard().setPixmap(pixmap)
 
     def _copy_prompt_json(self):
         if not self.folder_model:

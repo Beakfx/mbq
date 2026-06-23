@@ -80,7 +80,7 @@ Add **MBQ Wedge Scheduler** → connect `scheduler` output → KSampler `schedul
 
 **Option A — Windows installer**
 
-Download `MBQViewer-Setup-1.1.0.exe` from the **[Releases page](https://github.com/Beakfx/mbq/releases)** and run it. Installs to `Program Files\MBQ Viewer`, adds a Start Menu entry, and optionally a desktop shortcut. Uninstall via Windows Settings → Apps.
+Download `MBQViewer-Setup-1.2.0.exe` from the **[Releases page](https://github.com/Beakfx/mbq/releases)** and run it. Installs to `Program Files\MBQ Viewer`, adds a Start Menu entry, and optionally a desktop shortcut. Uninstall via Windows Settings → Apps.
 
 > **Windows SmartScreen:** MBQ Viewer is not yet code-signed, so Windows may show a "Windows protected your PC" dialog. Click **More info → Run anyway**. This is normal for unsigned indie software.
 

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QLabel,
 )
 from PySide6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QPainter, QImageReader, QFont
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 import os
 from pathlib import Path
@@ -130,6 +130,14 @@ class ImageCanvas(QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.image_item: QGraphicsPixmapItem | None = None
+        self._original_pixmap: QPixmap | None = None   # full-res source, never overwritten
+        self._native_size = None                        # original_pixmap.size(), cached
+        self._lod_active: bool = False                  # True if image_item holds a resample
+        self._lod_timer = QTimer(self)
+        self._lod_timer.setSingleShot(True)
+        self._lod_timer.timeout.connect(self._apply_lod)
+        self._LOD_THRESHOLD = 0.5     # below this effective scale, swap to a resample
+        self._LOD_DEBOUNCE_MS = 75    # tune after visual testing
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setRenderHint(QPainter.SmoothPixmapTransform, True)
         self.setViewport(QOpenGLWidget())
@@ -173,6 +181,59 @@ class ImageCanvas(QGraphicsView):
         delta = new_vp - self._zoom_anchor_vp
         self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() + delta.x())
         self.verticalScrollBar().setValue(self.verticalScrollBar().value() + delta.y())
+        self._schedule_lod_check()
+
+    def _schedule_lod_check(self):
+        self._lod_timer.start(self._LOD_DEBOUNCE_MS)
+
+    def _apply_lod(self):
+        """Swap to/from a resampled pixmap when zoomed past _LOD_THRESHOLD.
+
+        Qt's bilinear minification (no mipmaps) aliases badly once the display
+        scale drops far below 1:1 — worst on high-frequency content like UI
+        screenshot text. Below threshold, substitute a software-resampled
+        downscale (a real weighted resample) generated fresh from the original
+        pixmap every time, never from a previously-downscaled one, so repeated
+        zoom in/out never compounds quality loss. The swap uses the item's own
+        setScale() rather than the view's transform, so transform().m11() stays
+        a reliable "real" zoom level for everything else that reads it.
+        """
+        if self.image_item is None or self._original_pixmap is None:
+            return
+
+        scale = self.transform().m11()
+
+        if scale >= self._LOD_THRESHOLD:
+            if self._lod_active:
+                self.image_item.setPixmap(self._original_pixmap)
+                self.image_item.setScale(1.0)
+                self._lod_active = False
+            return
+
+        native_w, native_h = self._native_size.width(), self._native_size.height()
+        # Resample to the true PHYSICAL pixel count, not just native*scale (which
+        # is logical/device-independent only). QOpenGLWidget renders to physical
+        # pixels, so a logical-only target leaves the GPU to upscale our already-
+        # downsampled pixmap by devicePixelRatio -- a second blur pass stacked on
+        # top of the resample, right at the threshold crossing where it's most
+        # visible. setDevicePixelRatio() on the result tells Qt this pixmap
+        # already matches the physical grid, so no further GPU scaling happens.
+        dpr = self.devicePixelRatioF()
+        target_w = max(1, round(native_w * scale * dpr))
+        target_h = max(1, round(native_h * scale * dpr))
+
+        current = self.image_item.pixmap()
+        if self._lod_active and current.width() == target_w and current.height() == target_h:
+            return  # already resampled to this exact size
+
+        resampled = self._original_pixmap.scaled(
+            target_w, target_h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation,
+        )
+        resampled.setDevicePixelRatio(dpr)
+        self.image_item.setPixmap(resampled)
+        device_independent_w = target_w / dpr
+        self.image_item.setScale(native_w / device_independent_w)
+        self._lod_active = True
 
     def wheelEvent(self, event):
         if event.angleDelta().y() == 0:
@@ -247,6 +308,11 @@ class ImageCanvas(QGraphicsView):
 
     # --- Image Handling ---
     def _show_pixmap(self, pixmap: QPixmap):
+        self._original_pixmap = pixmap
+        self._native_size = pixmap.size()
+        self._lod_active = False
+        self._lod_timer.stop()
+
         if self.zoom_locked:
             saved_transform = self.transform()
             saved_h = self.horizontalScrollBar().value()
@@ -272,6 +338,7 @@ class ImageCanvas(QGraphicsView):
             self.resetTransform()   # 1:1 (100%)
             self.centerOn(rect.center())
         self.viewport().update()
+        self._schedule_lod_check()
 
     def load_image(self, path: str):
         pixmap = QPixmap(path)
@@ -281,20 +348,29 @@ class ImageCanvas(QGraphicsView):
     def load_image_from_pixmap(self, pixmap: QPixmap):
         self._show_pixmap(pixmap)
 
+    def original_pixmap(self) -> QPixmap | None:
+        return self._original_pixmap
+
     def reset_zoom(self):
         if self.image_item:
             self.resetTransform()
-            self.centerOn(self.image_item.boundingRect().center())
+            self.centerOn(self.image_item.sceneBoundingRect().center())
+            self._schedule_lod_check()
 
     def fit_zoom(self):
         if not self.image_item:
             return
-        r = self.image_item.boundingRect()
+        # sceneBoundingRect(), not boundingRect() — the item may currently be
+        # holding a downscaled LOD pixmap with a compensating setScale(), and
+        # sceneBoundingRect() is the one that stays pinned to native image size
+        # regardless of that (boundingRect() is item-local and would be wrong).
+        r = self.image_item.sceneBoundingRect()
         vw, vh = self.viewport().width(), self.viewport().height()
         scale = min(vw / r.width(), vh / r.height())
         self.resetTransform()
         self.scale(scale, scale)
         self.centerOn(r.center())
+        self._schedule_lod_check()
 
     def set_wedge_overlay(self, text: str | None, corner: str = "bottom_left"):
         self._wedge_corner = corner
