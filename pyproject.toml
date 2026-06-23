@@ -5,6 +5,9 @@ description = "Compare ComfyUI parameter values without contact sheets — sweep
 license = { file = "LICENSE" }
 readme = "README.md"
 
+[project.urls]
+Repository = "https://github.com/Beakfx/mbq"
+
 [tool.comfy]
 PublisherId = "beakfx"
 DisplayName = "MBQ Wedge"
