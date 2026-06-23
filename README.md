@@ -70,7 +70,7 @@ Add **MBQ Wedge Sampler** → connect `sampler_name` output → KSampler `sample
 
 ### Example — sweep a scheduler subset
 
-Add **MBQ Wedge Scheduler** → connect `scheduler` output → KSampler `scheduler`. In the filter field type one scheduler name per line. Node label shows **3 of 9 schedulers → 3 images**. Click Queue → 3 jobs.
+Add **MBQ Wedge Scheduler** → connect `scheduler` output → KSampler `scheduler`. In the filter field, type one scheduler name per line — or just paste a list, since spaces work as delimiters too (handy for pasting straight out of MBQ Viewer's metadata panel without reformatting). Node label shows **3 of 9 schedulers → 3 images**. Click Queue → 3 jobs.
 
 ---
 
