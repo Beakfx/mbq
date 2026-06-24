@@ -173,8 +173,14 @@ class ImageCanvas(QGraphicsView):
             super().keyPressEvent(event)
 
     def _zoom_at(self, factor: float):
-        if not (0.02 < self.transform().m11() * factor < 100.0):
+        current = self.transform().m11()
+        target = current * factor
+        if not (0.02 < target < 100.0):
             return
+        # Snap to exactly 100% when a wheel step would cross over it, so you
+        # can reliably land on pixel-perfect zoom without needing the R key.
+        if (current - 1.0) * (target - 1.0) < 0:
+            factor = 1.0 / current
         self.scale(factor, factor)
         # Keep the press-point anchor fixed in the viewport
         new_vp = self.mapFromScene(self._zoom_anchor_scene)
