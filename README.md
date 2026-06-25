@@ -26,10 +26,14 @@ ComfyUI doesn't need to be running.
 
 ### Install
 
-Copy (or symlink) the `ComfyUI-MBQWedge/` folder into your ComfyUI custom nodes directory and restart ComfyUI:
+**Via ComfyUI-Manager:** search for "MBQ Wedge" and install — also listed on the
+[Comfy Registry](https://registry.comfy.org).
+
+**Manual:** clone (or copy/symlink) this repo into your ComfyUI custom nodes directory and
+restart ComfyUI:
 
 ```
-ComfyUI/custom_nodes/ComfyUI-MBQWedge/
+ComfyUI/custom_nodes/mbq/
 ```
 
 All three nodes appear under **MBQ** in the node list.
@@ -45,7 +49,7 @@ Each node intercepts the Queue button and expands one click into N separate jobs
 | `int_value` | Any INT input (steps, width, …) |
 | `float_value` | Any FLOAT input (CFG, guidance, denoise, …) |
 
-Set `start`, `stop`, and `increment`. The node shows **will produce → N iterations** live as you adjust the range.
+Set `start`, `stop`, and `increment`. The node shows **will produce → N iterations** live as you adjust the range, plus a cosmetic **current → X.XX** readout that tracks `start`.
 
 **MBQ Wedge Sampler / Scheduler** — wire the output directly to `sampler_name` or `scheduler` on a KSampler. The output type matches the COMBO exactly so ComfyUI accepts the link. Values come from `comfy.samplers.KSampler.SAMPLERS` / `.SCHEDULERS` — the same live registry ComfyUI uses, so any samplers or schedulers added by other custom nodes are included automatically.
 
@@ -97,8 +101,8 @@ Download `MBQViewer.exe` from the **[Releases page](https://github.com/Beakfx/mb
 ```bash
 git clone https://github.com/Beakfx/mbq.git
 cd mbq
-pip install -r requirements.txt
-python mbq_viewer.py
+pip install -r viewer/requirements.txt
+python viewer/mbq_viewer.py
 ```
 
 Drag images in from Explorer or ComfyUI. Drag thumbnails out to Explorer or ComfyUI.
@@ -187,14 +191,17 @@ sceptical, or 'uncomfortable' — the image is shown as-is, but treat any displa
 
 ## File map
 
+Repo root doubles as the ComfyUI node package (so ComfyUI-Manager's git-clone install
+works directly against it); the viewer lives in `viewer/`.
+
 | File | Role |
 |------|------|
-| `mbq_viewer.py` | Main window — layout, menus, navigation, metadata display, filmstrip |
-| `mbq_functions.py` | `ImageCanvas` (OpenGL view), `ImageFolder`, `WorkflowCache` |
-| `mbq_parser.py` | PNG chunk extraction, ComfyUI prompt graph parsing, three-tier node classification |
-| `ComfyUI-MBQWedge/mbq_wedge.py` | All three MBQ Wedge node classes |
-| `ComfyUI-MBQWedge/__init__.py` | Node registration |
-| `ComfyUI-MBQWedge/js/mbq_wedge.js` | JS extension: widgets, queue intercept, seed handling |
+| `__init__.py` | Node registration |
+| `mbq_wedge.py` | All three MBQ Wedge node classes |
+| `js/mbq_wedge.js` | JS extension: widgets, queue intercept, seed handling |
+| `viewer/mbq_viewer.py` | Main window — layout, menus, navigation, metadata display, filmstrip |
+| `viewer/mbq_functions.py` | `ImageCanvas` (OpenGL view), `ImageFolder`, `WorkflowCache` |
+| `viewer/mbq_parser.py` | PNG chunk extraction, ComfyUI prompt graph parsing, three-tier node classification |
 
 ---
 
