@@ -64,7 +64,7 @@ Type=Application
 Name=MBQ Viewer
 Comment=Browse ComfyUI images and their generation settings
 Exec="$SCRIPT" %f
-Icon=mbq-viewer
+Icon=$ICON_FILE
 Terminal=false
 Categories=Graphics;Viewer;
 MimeType=image/png;image/jpeg;image/webp;inode/directory;
@@ -72,6 +72,8 @@ StartupWMClass=mbq-viewer
 EOF
     update-desktop-database "$(dirname "$DESKTOP_FILE")" 2>/dev/null || true
     gtk-update-icon-cache -q "$DATA_DIR/icons/hicolor" 2>/dev/null || true
+    # KDE caches the app menu separately; without this the entry can show up iconless until re-login
+    kbuildsycoca5 >/dev/null 2>&1 || kbuildsycoca6 >/dev/null 2>&1 || true
     echo "Installed:"
     echo "  command   $BIN_LINK"
     echo "  app menu  $DESKTOP_FILE"
