@@ -1,2 +1,2 @@
-pyside6
+PySide6-Essentials
 send2trash

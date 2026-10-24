@@ -1358,10 +1358,14 @@ if __name__ == "__main__":
     _p.setColor(QPalette.ColorRole.Highlight,       QColor(42, 130, 218))
     _p.setColor(QPalette.ColorRole.HighlightedText, QColor(0, 0, 0))
     app.setPalette(_p)
-    _base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    # Frozen: assets/ is bundled beside the exe. Source: assets/ is at repo root, one up from viewer/
+    _base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     _icon_path = os.path.join(_base, "assets", "mbq_icon.ico")
     if os.path.exists(_icon_path):
         app.setWindowIcon(QIcon(_icon_path))
+    # Linux: X11 WM_CLASS + desktop-file hint, so the taskbar matches windows to mbq-viewer.desktop
+    app.setApplicationName("mbq-viewer")
+    app.setDesktopFileName("mbq-viewer")
     window = MBQViewerApp()
     window.show()
     if len(sys.argv) > 1:

@@ -82,6 +82,8 @@ Add **MBQ Wedge Scheduler** → connect `scheduler` output → KSampler `schedul
 
 ### Install
 
+**Windows:** Option A or B · **Linux:** Option D · **Mac:** Option C
+
 **Option A — Windows installer**
 
 Download `MBQViewer-Setup-1.2.0.exe` from the **[Releases page](https://github.com/Beakfx/mbq/releases)** and run it. Installs to `Program Files\MBQ Viewer`, adds a Start Menu entry, and optionally a desktop shortcut. Uninstall via Windows Settings → Apps.
@@ -94,7 +96,7 @@ Download `MBQViewer.exe` from the **[Releases page](https://github.com/Beakfx/mb
 
 > Same SmartScreen note applies.
 
-**Option C — run from source (Windows / Linux / Mac)**
+**Option C — run from source (Mac / Windows)**
 
 **Requirements:** Python 3.11+
 
@@ -105,7 +107,31 @@ pip install -r viewer/requirements.txt
 python viewer/mbq_viewer.py
 ```
 
-Drag images in from Explorer or ComfyUI. Drag thumbnails out to Explorer or ComfyUI.
+On Linux, use Option D instead — it does the same thing inside its own venv, so nothing lands in system Python.
+
+**Option D — Linux launcher**
+
+**Requirements:** Python 3.11+
+
+Clone somewhere permanent (the `mbq-viewer` command runs straight from the clone), then install:
+
+```bash
+git clone https://github.com/Beakfx/mbq.git
+mbq/viewer/mbq_viewer.sh --install
+mbq-viewer [image-or-folder]
+```
+
+`--install` builds a private venv in `~/.local/share/mbq-viewer/venv` (a one-time download of about 300 MB, mostly Qt), adds an `mbq-viewer` command to `~/.local/bin`, and an **MBQ Viewer** entry to the app menu (also offered under "Open With" for images and folders).
+
+- **Updating:** `git pull` in the clone. Code changes apply on the next launch; the venv rebuilds itself if `viewer/requirements.txt` changes.
+- **Uninstalling:** `mbq/viewer/mbq_viewer.sh --uninstall` removes the command, menu entry and venv. Then delete the clone.
+- **Without installing:** `mbq/viewer/mbq_viewer.sh [image-or-folder]` builds the venv on first run and launches — no command or menu entry added.
+- **`mbq-viewer: command not found`:** `~/.local/bin` isn't on your `PATH` yet. Open a new terminal, or add `export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc`.
+- **Python version:** the launcher uses the newest `python3.13`/`3.12`/`3.11` it finds. On RHEL/Rocky 8 the default `python3` is 3.6, so `sudo dnf install python3.11` first.
+- **DCC workstations (Flame etc.):** the launcher never touches system Python and clears `PYTHONPATH`/`QT_PLUGIN_PATH` before starting, so a shell that sourced a DCC's environment can't leak its own PySide into the viewer.
+- **`Could not load the Qt platform plugin "xcb"`:** install `xcb-util-cursor` (RHEL/Rocky/Fedora) or `libxcb-cursor0` (Debian/Ubuntu).
+
+Once running: drag images in from your file manager or ComfyUI, and drag thumbnails out to either.
 
 ### Canvas
 
@@ -202,6 +228,8 @@ works directly against it); the viewer lives in `viewer/`.
 | `viewer/mbq_viewer.py` | Main window — layout, menus, navigation, metadata display, filmstrip |
 | `viewer/mbq_functions.py` | `ImageCanvas` (OpenGL view), `ImageFolder`, `WorkflowCache` |
 | `viewer/mbq_parser.py` | PNG chunk extraction, ComfyUI prompt graph parsing, three-tier node classification |
+| `viewer/requirements.txt` | Viewer's Python dependencies (PySide6-Essentials, Send2Trash) |
+| `viewer/mbq_viewer.sh` | Linux launcher — venv setup, `--install` / `--uninstall` |
 
 ---
 
@@ -210,7 +238,7 @@ works directly against it); the viewer lives in `viewer/`.
 - **ComfyUI only.** MBQ reads the `prompt` chunk written by ComfyUI's SaveImage node. A1111, NovelAI, InvokeAI, and other tools are not supported.
 - **Soft-fail.** If a PNG has no prompt chunk, MBQ shows the image and leaves the workflow panel blank — it never crashes or shows garbage.
 - **No ComfyUI runtime dependency.** MBQ Viewer reads PNG files directly; ComfyUI does not need to be running.
-- **Cross-platform.** Developed on Windows; should work on Linux. Mac support is untested.
+- **Cross-platform.** Developed on Windows; tested on Linux (Rocky 8, KDE). Mac support is untested.
 
 ---
 
